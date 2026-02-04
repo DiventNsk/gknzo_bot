@@ -1,0 +1,25 @@
+{
+  "name": "gknzo_bot",
+  "version": "1.0.0",
+  "description": "Telegram bot with Web App using GrammY",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "webapp",
+    "grammy"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "grammy": "^1.21.1",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
