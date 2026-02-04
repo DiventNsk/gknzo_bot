@@ -78,39 +78,50 @@ bot.command('getsheetsdata', async (ctx) => {
 
     if (result.success && result.data) {
       if (result.data.length > 0) {
-        // Фильтрация и сортировка данных
-        // Извлекаем заголовки (обычно первая строка)
-        const headers = result.data[0];
+        // Проверяем, что первая строка действительно содержит заголовки (массив)
+        const firstRow = result.data[0];
+        let headers = [];
+        let rows = result.data;
+
+        // Проверяем, является ли первая строка массивом (заголовки)
+        if (Array.isArray(firstRow)) {
+          headers = firstRow;
+          rows = result.data.slice(1); // пропускаем заголовки
+        } else {
+          // Если первая строка не является массивом, используем пустой массив заголовков
+          headers = Array.from({ length: firstRow.length || 0 }, (_, i) => `Столбец ${i + 1}`);
+        }
 
         // Находим индекс столбца с датами (предполагаем, что это один из столбцов)
         // В примере из .env видим даты в формате "02.12-08.12.25", ищем похожие заголовки
-        const dateColumnIndex = headers.findIndex(header =>
-          header && (header.includes('.') || header.includes('-')) // Простой способ определить столбец с датами
-        );
+        let dateColumnIndex = -1;
+        if (headers && Array.isArray(headers)) {
+          dateColumnIndex = headers.findIndex(header =>
+            header && (typeof header === 'string') && (header.includes('.') || header.includes('-')) // Простой способ определить столбец с датами
+          );
+        }
 
-        // Пропускаем первую строку (заголовки) и фильтруем данные
-        let filteredRows = result.data.slice(1).filter(row => {
-          if (dateColumnIndex !== -1 && row[dateColumnIndex]) {
+        // Фильтруем данные
+        let filteredRows = rows.filter(row => {
+          if (dateColumnIndex !== -1 && Array.isArray(row) && row[dateColumnIndex]) {
             const dateValue = row[dateColumnIndex];
             // Фильтруем, чтобы показать только:
             // 1. Периоды в конце января или феврале
             // 2. Пример: ищем даты, содержащие "01." (январь) или "02." (февраль)
-            return dateValue.includes('01.') || dateValue.includes('02.');
+            return (typeof dateValue === 'string') && (dateValue.includes('01.') || dateValue.includes('02.'));
           }
           return true; // Если не найден столбец с датами, возвращаем все строки
         });
 
         // Сортируем по дате (предполагаем, что формат даты позволяет сравнение строк)
-        filteredRows.sort((a, b) => {
-          if (dateColumnIndex !== -1) {
+        if (dateColumnIndex !== -1) {
+          filteredRows.sort((a, b) => {
             // Простая сортировка строковых дат - от самых свежих
-            return b[dateColumnIndex]?.localeCompare(a[dateColumnIndex]) || 0;
-          }
-          return 0;
-        });
-
-        // Добавляем заголовки обратно в отфильтрованные данные
-        const processedData = [headers, ...filteredRows];
+            const dateA = Array.isArray(a) ? a[dateColumnIndex] : '';
+            const dateB = Array.isArray(b) ? b[dateColumnIndex] : '';
+            return (typeof dateB === 'string' && typeof dateA === 'string') ? dateB.localeCompare(dateA) : 0;
+          });
+        }
 
         await ctx.reply(
           `✅ Данные из Google Sheets успешно получены и отфильтрованы!\n\n` +
@@ -121,7 +132,7 @@ bot.command('getsheetsdata', async (ctx) => {
         let formattedData = '📋 *Актуальные данные из Google Таблицы (отсортированы по дате, свежие первее):*\n\n';
 
         // Показываем первые 10 строк в более читаемом формате
-        const rowsToShow = processedData.slice(1, 11); // пропускаем заголовки и берем первые 10 данных
+        const rowsToShow = filteredRows.slice(0, 10); // берем первые 10 отфильтрованных данных
 
         for (let i = 0; i < rowsToShow.length; i++) {
           const row = rowsToShow[i];
@@ -130,7 +141,7 @@ bot.command('getsheetsdata', async (ctx) => {
           if (Array.isArray(row)) {
             formattedData += `*Запись ${i + 1}:*\n`;
             for (let j = 0; j < Math.min(headers.length, row.length); j++) {
-              const header = headers[j];
+              const header = headers[j] || `Столбец ${j + 1}`;
               const value = row[j];
               formattedData += `  • ${header}: ${value || 'пусто'}\n`;
             }
@@ -270,39 +281,50 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
 
     if (result.success && result.data) {
       if (result.data.length > 0) {
-        // Фильтрация и сортировка данных
-        // Извлекаем заголовки (обычно первая строка)
-        const headers = result.data[0];
+        // Проверяем, что первая строка действительно содержит заголовки (массив)
+        const firstRow = result.data[0];
+        let headers = [];
+        let rows = result.data;
+
+        // Проверяем, является ли первая строка массивом (заголовки)
+        if (Array.isArray(firstRow)) {
+          headers = firstRow;
+          rows = result.data.slice(1); // пропускаем заголовки
+        } else {
+          // Если первая строка не является массивом, используем пустой массив заголовков
+          headers = Array.from({ length: firstRow.length || 0 }, (_, i) => `Столбец ${i + 1}`);
+        }
 
         // Находим индекс столбца с датами (предполагаем, что это один из столбцов)
         // В примере из .env видим даты в формате "02.12-08.12.25", ищем похожие заголовки
-        const dateColumnIndex = headers.findIndex(header =>
-          header && (header.includes('.') || header.includes('-')) // Простой способ определить столбец с датами
-        );
+        let dateColumnIndex = -1;
+        if (headers && Array.isArray(headers)) {
+          dateColumnIndex = headers.findIndex(header =>
+            header && (typeof header === 'string') && (header.includes('.') || header.includes('-')) // Простой способ определить столбец с датами
+          );
+        }
 
-        // Пропускаем первую строку (заголовки) и фильтруем данные
-        let filteredRows = result.data.slice(1).filter(row => {
-          if (dateColumnIndex !== -1 && row[dateColumnIndex]) {
+        // Фильтруем данные
+        let filteredRows = rows.filter(row => {
+          if (dateColumnIndex !== -1 && Array.isArray(row) && row[dateColumnIndex]) {
             const dateValue = row[dateColumnIndex];
             // Фильтруем, чтобы показать только:
             // 1. Периоды в конце января или феврале
             // 2. Пример: ищем даты, содержащие "01." (январь) или "02." (февраль)
-            return dateValue.includes('01.') || dateValue.includes('02.');
+            return (typeof dateValue === 'string') && (dateValue.includes('01.') || dateValue.includes('02.'));
           }
           return true; // Если не найден столбец с датами, возвращаем все строки
         });
 
         // Сортируем по дате (предполагаем, что формат даты позволяет сравнение строк)
-        filteredRows.sort((a, b) => {
-          if (dateColumnIndex !== -1) {
+        if (dateColumnIndex !== -1) {
+          filteredRows.sort((a, b) => {
             // Простая сортировка строковых дат - от самых свежих
-            return b[dateColumnIndex]?.localeCompare(a[dateColumnIndex]) || 0;
-          }
-          return 0;
-        });
-
-        // Добавляем заголовки обратно в отфильтрованные данные
-        const processedData = [headers, ...filteredRows];
+            const dateA = Array.isArray(a) ? a[dateColumnIndex] : '';
+            const dateB = Array.isArray(b) ? b[dateColumnIndex] : '';
+            return (typeof dateB === 'string' && typeof dateA === 'string') ? dateB.localeCompare(dateA) : 0;
+          });
+        }
 
         await ctx.reply(
           `✅ Данные из Google Sheets успешно получены и отфильтрованы!\n\n` +
@@ -313,7 +335,7 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
         let formattedData = '📋 *Актуальные данные из Google Таблицы (отсортированы по дате, свежие первее):*\n\n';
 
         // Показываем первые 10 строк в более читаемом формате
-        const rowsToShow = processedData.slice(1, 11); // пропускаем заголовки и берем первые 10 данных
+        const rowsToShow = filteredRows.slice(0, 10); // берем первые 10 отфильтрованных данных
 
         for (let i = 0; i < rowsToShow.length; i++) {
           const row = rowsToShow[i];
@@ -322,7 +344,7 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
           if (Array.isArray(row)) {
             formattedData += `*Запись ${i + 1}:*\n`;
             for (let j = 0; j < Math.min(headers.length, row.length); j++) {
-              const header = headers[j];
+              const header = headers[j] || `Столбец ${j + 1}`;
               const value = row[j];
               formattedData += `  • ${header}: ${value || 'пусто'}\n`;
             }
