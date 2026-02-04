@@ -25,6 +25,8 @@ function checkAccess(ctx) {
 // Создаем бота
 const bot = new Bot(process.env.BOT_TOKEN);
 
+const { InlineKeyboard } = require('grammy');
+
 // Команда /start
 bot.command('start', async (ctx) => {
   // Проверяем доступ
@@ -32,11 +34,18 @@ bot.command('start', async (ctx) => {
     return;
   }
 
+  // Создаем inline клавиатуру с кнопками для запроса данных
+  const keyboard = new InlineKeyboard()
+    .text('📊 Получить данные из Google Sheets', 'get_sheets_data')
+    .row()
+    .text('📋 Получить метаданные таблицы', 'get_sheets_meta');
+
   await ctx.reply(
     'Привет! Это Telegram бот для получения данных из Google Таблиц.\n\n' +
-    'Доступные команды:\n' +
-    '/getsheetsdata - получить данные из Google Sheets\n' +
-    '/sheetsmeta - получить метаданные таблицы'
+    'Вы можете воспользоваться командами или кнопками ниже:',
+    {
+      reply_markup: keyboard
+    }
   );
 });
 
@@ -142,6 +151,106 @@ bot.on('message', async (ctx) => {
   }
 
   await ctx.reply('Привет! Используйте команды /getsheetsdata или /sheetsmeta для получения данных из Google Таблиц.');
+});
+
+// Обработчик нажатия на кнопку "Получить данные из Google Sheets"
+bot.callbackQuery('get_sheets_data', async (ctx) => {
+  // Проверяем доступ
+  if (!checkAccess(ctx)) {
+    return;
+  }
+
+  try {
+    // В реальном приложении spreadsheetId и range могут передаваться как параметры команды
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID; // ID таблицы из .env
+    const range = process.env.GOOGLE_SHEETS_RANGE || 'A1:Z100'; // Диапазон из .env или по умолчанию
+
+    if (!spreadsheetId) {
+      await ctx.reply('❌ ID таблицы Google Sheets не указан в настройках бота.');
+      return;
+    }
+
+    // Запрашиваем данные с сервера
+    const response = await fetch(`http://localhost:${process.env.PORT || 3000}/api/sheets-external/${spreadsheetId}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      if (result.data && result.data.length > 0) {
+        await ctx.reply(
+          `✅ Данные из Google Sheets успешно получены!\n\n` +
+          `📋 Найдено строк: ${result.data.length}`
+        );
+
+        // Отправляем первые несколько строк в качестве примера
+        const sampleData = result.data.slice(0, 5); // первые 5 строк
+        await ctx.reply(`Пример данных:\n${JSON.stringify(sampleData, null, 2)}`);
+      } else {
+        await ctx.reply('⚠️ В указанном диапазоне не найдено данных.');
+      }
+    } else {
+      await ctx.reply(`❌ Ошибка при получении данных из Google Sheets: ${result.message || result.error}`);
+    }
+  } catch (error) {
+    console.error('Ошибка при нажатии на кнопку получения данных:', error);
+    await ctx.reply('❌ Произошла ошибка при попытке получить данные из Google Sheets.');
+  } finally {
+    // Ответим на callback, чтобы убрать "часики" с кнопки
+    await ctx.answerCallbackQuery();
+  }
+});
+
+// Обработчик нажатия на кнопку "Получить метаданные таблицы"
+bot.callbackQuery('get_sheets_meta', async (ctx) => {
+  // Проверяем доступ
+  if (!checkAccess(ctx)) {
+    return;
+  }
+
+  try {
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+
+    if (!spreadsheetId) {
+      await ctx.reply('❌ ID таблицы Google Sheets не указан в настройках бота.');
+      return;
+    }
+
+    // Запрашиваем метаданные с сервера
+    const response = await fetch(`http://localhost:${process.env.PORT || 3000}/api/sheets/${spreadsheetId}/metadata`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      const metadata = result.metadata;
+      let metaMessage = `📋 Метаданные таблицы "${metadata.properties.title}":\n\n`;
+      metaMessage += `🆔 ID таблицы: ${spreadsheetId}\n`;
+      metaMessage += `📝 Название: ${metadata.properties.title}\n\n`;
+      metaMessage += `📚 Листы (${metadata.sheets.length}):\n`;
+
+      metadata.sheets.forEach((sheet, index) => {
+        const properties = sheet.properties;
+        metaMessage += `  ${index + 1}. "${properties.title}" - ${properties.gridProperties.rowCount}×${properties.gridProperties.columnCount}\n`;
+      });
+
+      await ctx.reply(metaMessage);
+    } else {
+      await ctx.reply(`❌ Ошибка при получении метаданных: ${result.message || result.error}`);
+    }
+  } catch (error) {
+    console.error('Ошибка при нажатии на кнопку получения метаданных:', error);
+    await ctx.reply('❌ Произошла ошибка при попытке получить метаданные Google Sheets.');
+  } finally {
+    // Ответим на callback, чтобы убрать "часики" с кнопки
+    await ctx.answerCallbackQuery();
+  }
 });
 
 // Запускаем бота
