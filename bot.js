@@ -116,10 +116,49 @@ bot.command('getsheetsdata', async (ctx) => {
         // Сортируем по дате (предполагаем, что формат даты позволяет сравнение строк)
         if (dateColumnIndex !== -1) {
           filteredRows.sort((a, b) => {
-            // Простая сортировка строковых дат - от самых свежих
+            // Сортировка строковых дат - от самых свежих к старым (убывающий порядок)
             const dateA = Array.isArray(a) ? a[dateColumnIndex] : '';
             const dateB = Array.isArray(b) ? b[dateColumnIndex] : '';
-            return (typeof dateB === 'string' && typeof dateA === 'string') ? dateB.localeCompare(dateA) : 0;
+
+            if (typeof dateB === 'string' && typeof dateA === 'string') {
+              // Попробуем распознать формат даты вида "DD.MM-DD.MM.YY" или "DD.MM.YY"
+              // и сортировать по ним
+              const extractDate = (dateStr) => {
+                // Ищем дату в формате DD.MM.YY или DD.MM-DD.MM.YY
+                const dateMatch = dateStr.match(/(\d{2}\.\d{2}(?:\.\d{2})?)/);
+                if (dateMatch) {
+                  let dateString = dateMatch[1];
+                  // Если это формат DD.MM-..., берем вторую дату
+                  if (dateString.includes('-')) {
+                    const dates = dateString.split('-');
+                    dateString = dates[dates.length - 1];
+                  }
+
+                  // Преобразуем в формат YYYY-MM-DD для правильной сортировки
+                  const parts = dateString.split('.');
+                  if (parts.length >= 2) {
+                    const day = parts[0];
+                    const month = parts[1];
+                    let year = parts[2] || '25'; // по умолчанию 2025 если год не указан
+
+                    // Преобразуем двухзначный год в четырехзначный
+                    if (year.length === 2) {
+                      year = '20' + year;
+                    }
+
+                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                  }
+                }
+                return dateStr; // возвращаем оригинальную строку, если не удалось распознать
+              };
+
+              const parsedDateB = extractDate(dateB);
+              const parsedDateA = extractDate(dateA);
+
+              // Сравниваем как даты в формате YYYY-MM-DD
+              return parsedDateB.localeCompare(parsedDateA);
+            }
+            return 0;
           });
         }
 
@@ -319,10 +358,49 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
         // Сортируем по дате (предполагаем, что формат даты позволяет сравнение строк)
         if (dateColumnIndex !== -1) {
           filteredRows.sort((a, b) => {
-            // Простая сортировка строковых дат - от самых свежих
+            // Сортировка строковых дат - от самых свежих к старым (убывающий порядок)
             const dateA = Array.isArray(a) ? a[dateColumnIndex] : '';
             const dateB = Array.isArray(b) ? b[dateColumnIndex] : '';
-            return (typeof dateB === 'string' && typeof dateA === 'string') ? dateB.localeCompare(dateA) : 0;
+
+            if (typeof dateB === 'string' && typeof dateA === 'string') {
+              // Попробуем распознать формат даты вида "DD.MM-DD.MM.YY" или "DD.MM.YY"
+              // и сортировать по ним
+              const extractDate = (dateStr) => {
+                // Ищем дату в формате DD.MM.YY или DD.MM-DD.MM.YY
+                const dateMatch = dateStr.match(/(\d{2}\.\d{2}(?:\.\d{2})?)/);
+                if (dateMatch) {
+                  let dateString = dateMatch[1];
+                  // Если это формат DD.MM-..., берем вторую дату
+                  if (dateString.includes('-')) {
+                    const dates = dateString.split('-');
+                    dateString = dates[dates.length - 1];
+                  }
+
+                  // Преобразуем в формат YYYY-MM-DD для правильной сортировки
+                  const parts = dateString.split('.');
+                  if (parts.length >= 2) {
+                    const day = parts[0];
+                    const month = parts[1];
+                    let year = parts[2] || '25'; // по умолчанию 2025 если год не указан
+
+                    // Преобразуем двухзначный год в четырехзначный
+                    if (year.length === 2) {
+                      year = '20' + year;
+                    }
+
+                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                  }
+                }
+                return dateStr; // возвращаем оригинальную строку, если не удалось распознать
+              };
+
+              const parsedDateB = extractDate(dateB);
+              const parsedDateA = extractDate(dateA);
+
+              // Сравниваем как даты в формате YYYY-MM-DD
+              return parsedDateB.localeCompare(parsedDateA);
+            }
+            return 0;
           });
         }
 
