@@ -1,0 +1,34 @@
+name: Deploy Server and Bot
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Setup PM2
+      run: |
+        npm install -g pm2
+
+    - name: Start server and bot with PM2
+      run: |
+        # Запуск сервера и бота с помощью PM2
+        pm2 start ecosystem.config.js
+        # Сохранение процесса для автозапуска
+        pm2 save
+        # Вывод статуса процессов
+        pm2 status
