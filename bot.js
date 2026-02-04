@@ -138,14 +138,20 @@ bot.command('getsheetsdata', async (ctx) => {
             const periodValue = periodColumnIndex !== -1 ? row[periodColumnIndex] : '';
             const yearValue = yearColumnIndex !== -1 ? row[yearColumnIndex] : '';
 
-            // Проверяем, содержит ли период январские или февральские даты
-            const hasJanOrFeb = (typeof periodValue === 'string') &&
-                               (periodValue.includes('01.') || periodValue.includes('02.'));
+            // Проверяем, содержит ли период даты февраля 2026 года
+            const hasFeb2026 = (typeof periodValue === 'string') &&
+                              (periodValue.includes('02.') &&
+                               (periodValue.includes('.26') || periodValue.includes('2026'))) ||
+                              (typeof yearValue === 'string' && yearValue.includes('2026') &&
+                               typeof periodValue === 'string' && periodValue.includes('02.'));
 
-            // Проверяем, относится ли год к 2026
-            const isYear2026 = (typeof yearValue === 'string') && yearValue.includes('2026');
+            // Проверяем, содержит ли период конкретно неделю 27.01-02.02.2026
+            const hasSpecificPeriod = (typeof periodValue === 'string') &&
+                                     periodValue.includes('27.01-02.02') &&
+                                     ((typeof yearValue === 'string' && yearValue.includes('2026')) ||
+                                      periodValue.includes('2026'));
 
-            return hasJanOrFeb || isYear2026;
+            return hasFeb2026 || hasSpecificPeriod;
           }
           return true; // Если не массив, возвращаем строку
         });
@@ -420,14 +426,20 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
             const periodValue = periodColumnIndex !== -1 ? row[periodColumnIndex] : '';
             const yearValue = yearColumnIndex !== -1 ? row[yearColumnIndex] : '';
 
-            // Проверяем, содержит ли период январские или февральские даты
-            const hasJanOrFeb = (typeof periodValue === 'string') &&
-                               (periodValue.includes('01.') || periodValue.includes('02.'));
+            // Проверяем, содержит ли период даты февраля 2026 года
+            const hasFeb2026 = (typeof periodValue === 'string') &&
+                              (periodValue.includes('02.') &&
+                               (periodValue.includes('.26') || periodValue.includes('2026'))) ||
+                              (typeof yearValue === 'string' && yearValue.includes('2026') &&
+                               typeof periodValue === 'string' && periodValue.includes('02.'));
 
-            // Проверяем, относится ли год к 2026
-            const isYear2026 = (typeof yearValue === 'string') && yearValue.includes('2026');
+            // Проверяем, содержит ли период конкретно неделю 27.01-02.02.2026
+            const hasSpecificPeriod = (typeof periodValue === 'string') &&
+                                     periodValue.includes('27.01-02.02') &&
+                                     ((typeof yearValue === 'string' && yearValue.includes('2026')) ||
+                                      periodValue.includes('2026'));
 
-            return hasJanOrFeb || isYear2026;
+            return hasFeb2026 || hasSpecificPeriod;
           }
           return true; // Если не массив, возвращаем строку
         });
