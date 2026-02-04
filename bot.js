@@ -92,71 +92,107 @@ bot.command('getsheetsdata', async (ctx) => {
           headers = Array.from({ length: firstRow.length || 0 }, (_, i) => `Столбец ${i + 1}`);
         }
 
-        // Находим индекс столбца с датами (предполагаем, что это один из столбцов)
-        // В примере из .env видим даты в формате "02.12-08.12.25", ищем похожие заголовки
-        let dateColumnIndex = -1;
+        // Находим индексы столбцов с датами
+        // Один столбец содержит период (например, "27.01-02.02"), другой - год ("2026")
+        let periodColumnIndex = -1;
+        let yearColumnIndex = -1;
+
         if (headers && Array.isArray(headers)) {
-          dateColumnIndex = headers.findIndex(header =>
-            header && (typeof header === 'string') && (header.includes('.') || header.includes('-')) // Простой способ определить столбец с датами
-          );
+          // Ищем столбцы с датами по названию или содержимому
+          for (let i = 0; i < headers.length; i++) {
+            const header = headers[i];
+            if (typeof header === 'string') {
+              // Проверяем, содержит ли заголовок или первые значения в столбце даты
+              if (header.toLowerCase().includes('недел') || header.toLowerCase().includes('период') ||
+                  header.includes('.') || header.includes('-')) {
+                periodColumnIndex = i;
+              } else if (header.toLowerCase().includes('год') || header.includes('202')) {
+                yearColumnIndex = i;
+              }
+            }
+          }
+
+          // Если не нашли по названию, ищем по содержимому первых нескольких строк
+          if (periodColumnIndex === -1 || yearColumnIndex === -1) {
+            for (let i = 0; i < headers.length && (periodColumnIndex === -1 || yearColumnIndex === -1); i++) {
+              // Проверяем первые несколько строк на наличие дат
+              for (let j = 0; j < Math.min(5, rows.length); j++) {
+                if (Array.isArray(rows[j]) && rows[j][i]) {
+                  const cellValue = rows[j][i];
+                  if (typeof cellValue === 'string') {
+                    if ((cellValue.includes('.') || cellValue.includes('-')) && periodColumnIndex === -1) {
+                      periodColumnIndex = i;
+                    } else if (cellValue.includes('202') && yearColumnIndex === -1) {
+                      yearColumnIndex = i;
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
 
         // Фильтруем данные
         let filteredRows = rows.filter(row => {
-          if (dateColumnIndex !== -1 && Array.isArray(row) && row[dateColumnIndex]) {
-            const dateValue = row[dateColumnIndex];
-            // Фильтруем, чтобы показать только:
-            // 1. Периоды в конце января или феврале
-            // 2. Пример: ищем даты, содержащие "01." (январь) или "02." (февраль)
-            return (typeof dateValue === 'string') && (dateValue.includes('01.') || dateValue.includes('02.'));
+          if (Array.isArray(row)) {
+            const periodValue = periodColumnIndex !== -1 ? row[periodColumnIndex] : '';
+            const yearValue = yearColumnIndex !== -1 ? row[yearColumnIndex] : '';
+
+            // Проверяем, содержит ли период январские или февральские даты
+            const hasJanOrFeb = (typeof periodValue === 'string') &&
+                               (periodValue.includes('01.') || periodValue.includes('02.'));
+
+            // Проверяем, относится ли год к 2026
+            const isYear2026 = (typeof yearValue === 'string') && yearValue.includes('2026');
+
+            return hasJanOrFeb || isYear2026;
           }
-          return true; // Если не найден столбец с датами, возвращаем все строки
+          return true; // Если не массив, возвращаем строку
         });
 
-        // Сортируем по дате (предполагаем, что формат даты позволяет сравнение строк)
-        if (dateColumnIndex !== -1) {
+        // Сортируем по дате (комбинируя период и год)
+        if (periodColumnIndex !== -1) {
           filteredRows.sort((a, b) => {
-            // Сортировка строковых дат - от самых свежих к старым (убывающий порядок)
-            const dateA = Array.isArray(a) ? a[dateColumnIndex] : '';
-            const dateB = Array.isArray(b) ? b[dateColumnIndex] : '';
+            // Сортировка по комбинированной дате - от самых свежих к старым (убывающий порядок)
+            const periodA = Array.isArray(a) ? a[periodColumnIndex] : '';
+            const periodB = Array.isArray(b) ? b[periodColumnIndex] : '';
 
-            if (typeof dateB === 'string' && typeof dateA === 'string') {
-              // Попробуем распознать формат даты вида "DD.MM-DD.MM.YY" или "DD.MM.YY"
-              // и сортировать по ним
-              const extractDate = (dateStr) => {
-                // Ищем дату в формате DD.MM.YY или DD.MM-DD.MM.YY
-                const dateMatch = dateStr.match(/(\d{2}\.\d{2}(?:\.\d{2})?)/);
-                if (dateMatch) {
-                  let dateString = dateMatch[1];
-                  // Если это формат DD.MM-..., берем вторую дату
-                  if (dateString.includes('-')) {
-                    const dates = dateString.split('-');
-                    dateString = dates[dates.length - 1];
-                  }
+            // Получаем годы, если они есть
+            const yearA = yearColumnIndex !== -1 && Array.isArray(a) ? a[yearColumnIndex] : '2025';
+            const yearB = yearColumnIndex !== -1 && Array.isArray(b) ? b[yearColumnIndex] : '2025';
 
-                  // Преобразуем в формат YYYY-MM-DD для правильной сортировки
-                  const parts = dateString.split('.');
-                  if (parts.length >= 2) {
-                    const day = parts[0];
-                    const month = parts[1];
-                    let year = parts[2] || '25'; // по умолчанию 2025 если год не указан
+            if (typeof periodA === 'string' && typeof periodB === 'string') {
+              // Функция для извлечения даты из формата "DD.MM-DD.MM" или "DD.MM"
+              const extractDate = (periodStr, yearStr) => {
+                // Извлекаем последнюю дату из периода (например, "02.02" из "27.01-02.02")
+                let datePart = periodStr;
 
-                    // Преобразуем двухзначный год в четырехзначный
-                    if (year.length === 2) {
-                      year = '20' + year;
-                    }
-
-                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                  }
+                if (datePart.includes('-')) {
+                  // Берем вторую часть периода
+                  const parts = datePart.split('-');
+                  datePart = parts[parts.length - 1].trim();
                 }
-                return dateStr; // возвращаем оригинальную строку, если не удалось распознать
+
+                // Извлекаем день и месяц
+                const dateMatch = datePart.match(/(\d{2})\.(\d{2})/);
+                if (dateMatch) {
+                  const day = dateMatch[1];
+                  const month = dateMatch[2];
+                  // Извлекаем год из строки года
+                  const yearMatch = yearStr.match(/20\d{2}/);
+                  const year = yearMatch ? yearMatch[0] : '2025';
+
+                  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                }
+
+                return '1900-01-01'; // возвращаем минимальную дату, если не удалось распознать
               };
 
-              const parsedDateB = extractDate(dateB);
-              const parsedDateA = extractDate(dateA);
+              const fullDateA = extractDate(periodA, typeof yearA === 'string' ? yearA : '');
+              const fullDateB = extractDate(periodB, typeof yearB === 'string' ? yearB : '');
 
-              // Сравниваем как даты в формате YYYY-MM-DD
-              return parsedDateB.localeCompare(parsedDateA);
+              // Сравниваем как даты в формате YYYY-MM-DD (по убыванию)
+              return fullDateB.localeCompare(fullDateA);
             }
             return 0;
           });
@@ -334,71 +370,107 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
           headers = Array.from({ length: firstRow.length || 0 }, (_, i) => `Столбец ${i + 1}`);
         }
 
-        // Находим индекс столбца с датами (предполагаем, что это один из столбцов)
-        // В примере из .env видим даты в формате "02.12-08.12.25", ищем похожие заголовки
-        let dateColumnIndex = -1;
+        // Находим индексы столбцов с датами
+        // Один столбец содержит период (например, "27.01-02.02"), другой - год ("2026")
+        let periodColumnIndex = -1;
+        let yearColumnIndex = -1;
+
         if (headers && Array.isArray(headers)) {
-          dateColumnIndex = headers.findIndex(header =>
-            header && (typeof header === 'string') && (header.includes('.') || header.includes('-')) // Простой способ определить столбец с датами
-          );
+          // Ищем столбцы с датами по названию или содержимому
+          for (let i = 0; i < headers.length; i++) {
+            const header = headers[i];
+            if (typeof header === 'string') {
+              // Проверяем, содержит ли заголовок или первые значения в столбце даты
+              if (header.toLowerCase().includes('недел') || header.toLowerCase().includes('период') ||
+                  header.includes('.') || header.includes('-')) {
+                periodColumnIndex = i;
+              } else if (header.toLowerCase().includes('год') || header.includes('202')) {
+                yearColumnIndex = i;
+              }
+            }
+          }
+
+          // Если не нашли по названию, ищем по содержимому первых нескольких строк
+          if (periodColumnIndex === -1 || yearColumnIndex === -1) {
+            for (let i = 0; i < headers.length && (periodColumnIndex === -1 || yearColumnIndex === -1); i++) {
+              // Проверяем первые несколько строк на наличие дат
+              for (let j = 0; j < Math.min(5, rows.length); j++) {
+                if (Array.isArray(rows[j]) && rows[j][i]) {
+                  const cellValue = rows[j][i];
+                  if (typeof cellValue === 'string') {
+                    if ((cellValue.includes('.') || cellValue.includes('-')) && periodColumnIndex === -1) {
+                      periodColumnIndex = i;
+                    } else if (cellValue.includes('202') && yearColumnIndex === -1) {
+                      yearColumnIndex = i;
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
 
         // Фильтруем данные
         let filteredRows = rows.filter(row => {
-          if (dateColumnIndex !== -1 && Array.isArray(row) && row[dateColumnIndex]) {
-            const dateValue = row[dateColumnIndex];
-            // Фильтруем, чтобы показать только:
-            // 1. Периоды в конце января или феврале
-            // 2. Пример: ищем даты, содержащие "01." (январь) или "02." (февраль)
-            return (typeof dateValue === 'string') && (dateValue.includes('01.') || dateValue.includes('02.'));
+          if (Array.isArray(row)) {
+            const periodValue = periodColumnIndex !== -1 ? row[periodColumnIndex] : '';
+            const yearValue = yearColumnIndex !== -1 ? row[yearColumnIndex] : '';
+
+            // Проверяем, содержит ли период январские или февральские даты
+            const hasJanOrFeb = (typeof periodValue === 'string') &&
+                               (periodValue.includes('01.') || periodValue.includes('02.'));
+
+            // Проверяем, относится ли год к 2026
+            const isYear2026 = (typeof yearValue === 'string') && yearValue.includes('2026');
+
+            return hasJanOrFeb || isYear2026;
           }
-          return true; // Если не найден столбец с датами, возвращаем все строки
+          return true; // Если не массив, возвращаем строку
         });
 
-        // Сортируем по дате (предполагаем, что формат даты позволяет сравнение строк)
-        if (dateColumnIndex !== -1) {
+        // Сортируем по дате (комбинируя период и год)
+        if (periodColumnIndex !== -1) {
           filteredRows.sort((a, b) => {
-            // Сортировка строковых дат - от самых свежих к старым (убывающий порядок)
-            const dateA = Array.isArray(a) ? a[dateColumnIndex] : '';
-            const dateB = Array.isArray(b) ? b[dateColumnIndex] : '';
+            // Сортировка по комбинированной дате - от самых свежих к старым (убывающий порядок)
+            const periodA = Array.isArray(a) ? a[periodColumnIndex] : '';
+            const periodB = Array.isArray(b) ? b[periodColumnIndex] : '';
 
-            if (typeof dateB === 'string' && typeof dateA === 'string') {
-              // Попробуем распознать формат даты вида "DD.MM-DD.MM.YY" или "DD.MM.YY"
-              // и сортировать по ним
-              const extractDate = (dateStr) => {
-                // Ищем дату в формате DD.MM.YY или DD.MM-DD.MM.YY
-                const dateMatch = dateStr.match(/(\d{2}\.\d{2}(?:\.\d{2})?)/);
-                if (dateMatch) {
-                  let dateString = dateMatch[1];
-                  // Если это формат DD.MM-..., берем вторую дату
-                  if (dateString.includes('-')) {
-                    const dates = dateString.split('-');
-                    dateString = dates[dates.length - 1];
-                  }
+            // Получаем годы, если они есть
+            const yearA = yearColumnIndex !== -1 && Array.isArray(a) ? a[yearColumnIndex] : '2025';
+            const yearB = yearColumnIndex !== -1 && Array.isArray(b) ? b[yearColumnIndex] : '2025';
 
-                  // Преобразуем в формат YYYY-MM-DD для правильной сортировки
-                  const parts = dateString.split('.');
-                  if (parts.length >= 2) {
-                    const day = parts[0];
-                    const month = parts[1];
-                    let year = parts[2] || '25'; // по умолчанию 2025 если год не указан
+            if (typeof periodA === 'string' && typeof periodB === 'string') {
+              // Функция для извлечения даты из формата "DD.MM-DD.MM" или "DD.MM"
+              const extractDate = (periodStr, yearStr) => {
+                // Извлекаем последнюю дату из периода (например, "02.02" из "27.01-02.02")
+                let datePart = periodStr;
 
-                    // Преобразуем двухзначный год в четырехзначный
-                    if (year.length === 2) {
-                      year = '20' + year;
-                    }
-
-                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                  }
+                if (datePart.includes('-')) {
+                  // Берем вторую часть периода
+                  const parts = datePart.split('-');
+                  datePart = parts[parts.length - 1].trim();
                 }
-                return dateStr; // возвращаем оригинальную строку, если не удалось распознать
+
+                // Извлекаем день и месяц
+                const dateMatch = datePart.match(/(\d{2})\.(\d{2})/);
+                if (dateMatch) {
+                  const day = dateMatch[1];
+                  const month = dateMatch[2];
+                  // Извлекаем год из строки года
+                  const yearMatch = yearStr.match(/20\d{2}/);
+                  const year = yearMatch ? yearMatch[0] : '2025';
+
+                  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                }
+
+                return '1900-01-01'; // возвращаем минимальную дату, если не удалось распознать
               };
 
-              const parsedDateB = extractDate(dateB);
-              const parsedDateA = extractDate(dateA);
+              const fullDateA = extractDate(periodA, typeof yearA === 'string' ? yearA : '');
+              const fullDateB = extractDate(periodB, typeof yearB === 'string' ? yearB : '');
 
-              // Сравниваем как даты в формате YYYY-MM-DD
-              return parsedDateB.localeCompare(parsedDateA);
+              // Сравниваем как даты в формате YYYY-MM-DD (по убыванию)
+              return fullDateB.localeCompare(fullDateA);
             }
             return 0;
           });
