@@ -60,17 +60,15 @@ bot.command('getsheetsdata', async (ctx) => {
   }
 
   try {
-    // В реальном приложении spreadsheetId и range могут передаваться как параметры команды
-    const spreadsheetId = process.env.GOOGLE_SHEETS_ID; // ID таблицы из .env
-    const range = process.env.GOOGLE_SHEETS_RANGE || 'A1:Z100'; // Диапазон из .env или по умолчанию
+    // Используем прямой вызов к LivePolls API, как в примере из .env
+    // https://sheets.livepolls.app/api/spreadsheets/28ec78fb-2c6d-4025-86f4-703a6c4720b0/%D0%9D%D0%9F
+    const apiUrl = 'https://sheets.livepolls.app/api/spreadsheets/28ec78fb-2c6d-4025-86f4-703a6c4720b0/%D0%9D%D0%9F';
 
-    if (!spreadsheetId) {
-      await ctx.reply('❌ ID таблицы Google Sheets не указан в настройках бота.');
-      return;
-    }
-
-    // Запрашиваем данные с сервера
-    const response = await fetch(`http://localhost:${process.env.PORT || 3000}/api/sheets-external/${spreadsheetId}`);
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -78,8 +76,8 @@ bot.command('getsheetsdata', async (ctx) => {
 
     const result = await response.json();
 
-    if (result.success) {
-      if (result.data && result.data.length > 0) {
+    if (result.success && result.data) {
+      if (result.data.length > 0) {
         await ctx.reply(
           `✅ Данные из Google Sheets успешно получены!\n\n` +
           `📋 Найдено строк: ${result.data.length}`
@@ -89,10 +87,10 @@ bot.command('getsheetsdata', async (ctx) => {
         const sampleData = result.data.slice(0, 5); // первые 5 строк
         await ctx.reply(`Пример данных:\n${JSON.stringify(sampleData, null, 2)}`);
       } else {
-        await ctx.reply('⚠️ В указанном диапазоне не найдено данных.');
+        await ctx.reply('⚠️ В таблице не найдено данных.');
       }
     } else {
-      await ctx.reply(`❌ Ошибка при получении данных из Google Sheets: ${result.message || result.error}`);
+      await ctx.reply(`❌ Ошибка при получении данных из Google Sheets: ${result.msg || result.error || 'Неизвестная ошибка'}`);
     }
   } catch (error) {
     console.error('Ошибка в команде /getsheetsdata:', error);
