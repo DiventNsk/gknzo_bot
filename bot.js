@@ -93,20 +93,20 @@ bot.command('getsheetsdata', async (ctx) => {
         }
 
         // Находим индексы столбцов с датами
-        // Один столбец содержит период (например, "27.01-02.02"), другой - год ("2026")
+        // Столбец C содержит период (например, "27.01-02.02"), столбец D - год ("2026")
         let periodColumnIndex = -1;
         let yearColumnIndex = -1;
 
         if (headers && Array.isArray(headers)) {
-          // Ищем столбцы с датами по названию или содержимому
+          // Ищем столбцы с датами по названию
           for (let i = 0; i < headers.length; i++) {
             const header = headers[i];
             if (typeof header === 'string') {
-              // Проверяем, содержит ли заголовок или первые значения в столбце даты
-              if (header.toLowerCase().includes('недел') || header.toLowerCase().includes('период') ||
-                  header.includes('.') || header.includes('-')) {
+              // Ищем столбцы по названию: C (период) и D (год)
+              if (i === 2 || header.toLowerCase().includes('недел') || header.toLowerCase().includes('период') ||
+                  (header.includes('.') || header.includes('-'))) {
                 periodColumnIndex = i;
-              } else if (header.toLowerCase().includes('год') || header.includes('202')) {
+              } else if (i === 3 || header.toLowerCase().includes('год') || header.includes('2026')) {
                 yearColumnIndex = i;
               }
             }
@@ -120,9 +120,12 @@ bot.command('getsheetsdata', async (ctx) => {
                 if (Array.isArray(rows[j]) && rows[j][i]) {
                   const cellValue = rows[j][i];
                   if (typeof cellValue === 'string') {
-                    if ((cellValue.includes('.') || cellValue.includes('-')) && periodColumnIndex === -1) {
+                    // Проверяем формат даты вида "DD.MM-DD.MM" в столбце C
+                    if (cellValue.includes('.') && cellValue.includes('-') && periodColumnIndex === -1) {
                       periodColumnIndex = i;
-                    } else if (cellValue.includes('202') && yearColumnIndex === -1) {
+                    }
+                    // Проверяем год 2026 в столбце D
+                    else if (cellValue.includes('2026') && yearColumnIndex === -1) {
                       yearColumnIndex = i;
                     }
                   }
@@ -140,16 +143,13 @@ bot.command('getsheetsdata', async (ctx) => {
 
             // Проверяем, содержит ли период даты февраля 2026 года
             const hasFeb2026 = (typeof periodValue === 'string') &&
-                              (periodValue.includes('02.') &&
-                               (periodValue.includes('.26') || periodValue.includes('2026'))) ||
-                              (typeof yearValue === 'string' && yearValue.includes('2026') &&
-                               typeof periodValue === 'string' && periodValue.includes('02.'));
+                              periodValue.includes('02.') &&
+                              (typeof yearValue === 'string' && yearValue.includes('2026'));
 
-            // Проверяем, содержит ли период конкретно неделю 27.01-02.02.2026
+            // Проверяем, содержит ли период конкретно неделю 27.01-02.02 с годом 2026
             const hasSpecificPeriod = (typeof periodValue === 'string') &&
                                      periodValue.includes('27.01-02.02') &&
-                                     ((typeof yearValue === 'string' && yearValue.includes('2026')) ||
-                                      periodValue.includes('2026'));
+                                     (typeof yearValue === 'string' && yearValue.includes('2026'));
 
             return hasFeb2026 || hasSpecificPeriod;
           }
@@ -381,20 +381,20 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
         }
 
         // Находим индексы столбцов с датами
-        // Один столбец содержит период (например, "27.01-02.02"), другой - год ("2026")
+        // Столбец C содержит период (например, "27.01-02.02"), столбец D - год ("2026")
         let periodColumnIndex = -1;
         let yearColumnIndex = -1;
 
         if (headers && Array.isArray(headers)) {
-          // Ищем столбцы с датами по названию или содержимому
+          // Ищем столбцы с датами по названию
           for (let i = 0; i < headers.length; i++) {
             const header = headers[i];
             if (typeof header === 'string') {
-              // Проверяем, содержит ли заголовок или первые значения в столбце даты
-              if (header.toLowerCase().includes('недел') || header.toLowerCase().includes('период') ||
-                  header.includes('.') || header.includes('-')) {
+              // Ищем столбцы по названию: C (период) и D (год)
+              if (i === 2 || header.toLowerCase().includes('недел') || header.toLowerCase().includes('период') ||
+                  (header.includes('.') || header.includes('-'))) {
                 periodColumnIndex = i;
-              } else if (header.toLowerCase().includes('год') || header.includes('202')) {
+              } else if (i === 3 || header.toLowerCase().includes('год') || header.includes('2026')) {
                 yearColumnIndex = i;
               }
             }
@@ -408,9 +408,12 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
                 if (Array.isArray(rows[j]) && rows[j][i]) {
                   const cellValue = rows[j][i];
                   if (typeof cellValue === 'string') {
-                    if ((cellValue.includes('.') || cellValue.includes('-')) && periodColumnIndex === -1) {
+                    // Проверяем формат даты вида "DD.MM-DD.MM" в столбце C
+                    if (cellValue.includes('.') && cellValue.includes('-') && periodColumnIndex === -1) {
                       periodColumnIndex = i;
-                    } else if (cellValue.includes('202') && yearColumnIndex === -1) {
+                    }
+                    // Проверяем год 2026 в столбце D
+                    else if (cellValue.includes('2026') && yearColumnIndex === -1) {
                       yearColumnIndex = i;
                     }
                   }
@@ -428,16 +431,13 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
 
             // Проверяем, содержит ли период даты февраля 2026 года
             const hasFeb2026 = (typeof periodValue === 'string') &&
-                              (periodValue.includes('02.') &&
-                               (periodValue.includes('.26') || periodValue.includes('2026'))) ||
-                              (typeof yearValue === 'string' && yearValue.includes('2026') &&
-                               typeof periodValue === 'string' && periodValue.includes('02.'));
+                              periodValue.includes('02.') &&
+                              (typeof yearValue === 'string' && yearValue.includes('2026'));
 
-            // Проверяем, содержит ли период конкретно неделю 27.01-02.02.2026
+            // Проверяем, содержит ли период конкретно неделю 27.01-02.02 с годом 2026
             const hasSpecificPeriod = (typeof periodValue === 'string') &&
                                      periodValue.includes('27.01-02.02') &&
-                                     ((typeof yearValue === 'string' && yearValue.includes('2026')) ||
-                                      periodValue.includes('2026'));
+                                     (typeof yearValue === 'string' && yearValue.includes('2026'));
 
             return hasFeb2026 || hasSpecificPeriod;
           }
