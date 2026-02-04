@@ -48,30 +48,30 @@ class BotGoogleSheetsIntegration {
           return;
         }
 
-        const result = await this.sheetsService.getSpreadsheetData(spreadsheetId, range);
+        // Запрашиваем данные с сервера
+        const response = await fetch(`http://localhost:${process.env.PORT || 3000}/api/sheets-external/${spreadsheetId}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
 
         if (result.success) {
-          const formattedData = this.sheetsService.formatDataForWebApp(result.data);
-
-          if (formattedData.length > 0) {
-            // Отправляем пользователю количество строк и возможность открыть Web App с данными
-            const keyboard = new InlineKeyboard()
-              .webApp('📊 Просмотреть данные', `${process.env.WEB_APP_URL}?view=sheets_data`);
-
+          if (result.data && result.data.length > 0) {
             await ctx.reply(
               `✅ Данные из Google Sheets успешно получены!\n\n` +
-              `📋 Найдено строк: ${formattedData.length}\n` +
-              `📈 Найдено столбцов: ${result.numCols}\n\n` +
-              `Нажмите кнопку ниже, чтобы открыть данные в Web App:`,
-              {
-                reply_markup: keyboard,
-              }
+              `📋 Найдено строк: ${result.data.length}`
             );
+
+            // Отправляем первые несколько строк в качестве примера
+            const sampleData = result.data.slice(0, 5); // первые 5 строк
+            await ctx.reply(`Пример данных:\n${JSON.stringify(sampleData, null, 2)}`);
           } else {
             await ctx.reply('⚠️ В указанном диапазоне не найдено данных.');
           }
         } else {
-          await ctx.reply(`❌ Ошибка при получении данных из Google Sheets: ${result.message}`);
+          await ctx.reply(`❌ Ошибка при получении данных из Google Sheets: ${result.message || result.error}`);
         }
       } catch (error) {
         console.error('Ошибка в команде /getsheetsdata:', error);
@@ -94,29 +94,30 @@ class BotGoogleSheetsIntegration {
           return;
         }
 
-        const result = await this.sheetsService.getSpreadsheetMetadata(spreadsheetId);
+        // Запрашиваем метаданные с сервера
+        const response = await fetch(`http://localhost:${process.env.PORT || 3000}/api/sheets/${spreadsheetId}/metadata`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
 
         if (result.success) {
-          const sheetInfo = result.metadata.sheets.map(sheet => ({
-            title: sheet.properties.title,
-            sheetId: sheet.properties.sheetId,
-            rowCount: sheet.properties.gridProperties.rowCount,
-            colCount: sheet.properties.gridProperties.columnCount
-          }));
-
-          let metaMessage = `📋 Метаданные таблицы "${result.metadata.properties.title}":\n\n`;
+          const metadata = result.metadata;
+          let metaMessage = `📋 Метаданные таблицы "${metadata.properties.title}":\n\n`;
           metaMessage += `🆔 ID таблицы: ${spreadsheetId}\n`;
-          metaMessage += `📝 Название: ${result.metadata.properties.title}\n`;
-          metaMessage += `👥 Последний редактор: ${result.metadata.lastModifiedBy.displayName}\n\n`;
-          metaMessage += `📚 Листы (${sheetInfo.length}):\n`;
+          metaMessage += `📝 Название: ${metadata.properties.title}\n\n`;
+          metaMessage += `📚 Листы (${metadata.sheets.length}):\n`;
 
-          sheetInfo.forEach((sheet, index) => {
-            metaMessage += `  ${index + 1}. "${sheet.title}" (ID: ${sheet.sheetId}) - ${sheet.rowCount}×${sheet.colCount}\n`;
+          metadata.sheets.forEach((sheet, index) => {
+            const properties = sheet.properties;
+            metaMessage += `  ${index + 1}. "${properties.title}" - ${properties.gridProperties.rowCount}×${properties.gridProperties.columnCount}\n`;
           });
 
           await ctx.reply(metaMessage);
         } else {
-          await ctx.reply(`❌ Ошибка при получении метаданных: ${result.message}`);
+          await ctx.reply(`❌ Ошибка при получении метаданных: ${result.message || result.error}`);
         }
       } catch (error) {
         console.error('Ошибка в команде /sheetsmeta:', error);

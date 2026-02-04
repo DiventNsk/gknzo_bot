@@ -1,7 +1,5 @@
-const { Bot, InlineKeyboard } = require('grammy');
-const { webAppData } = require('@grammyjs/web-app');
+const { Bot } = require('grammy');
 require('dotenv').config();
-const BotGoogleSheetsIntegration = require('./services/botGoogleSheetsIntegration');
 
 // Функция для получения разрешенных ID пользователей из .env
 function getAllowedUserIds() {
@@ -24,12 +22,8 @@ function checkAccess(ctx) {
   return true;
 }
 
-// Создаем интеграцию с Google Sheets
-const botSheetsIntegration = new BotGoogleSheetsIntegration(process.env.BOT_TOKEN);
-const bot = botSheetsIntegration.getBot();
-
-// Устанавливаем команды для интеграции с Google Sheets
-botSheetsIntegration.setupCommands();
+// Создаем бота
+const bot = new Bot(process.env.BOT_TOKEN);
 
 // Команда /start
 bot.command('start', async (ctx) => {
@@ -38,39 +32,105 @@ bot.command('start', async (ctx) => {
     return;
   }
 
-  const keyboard = new InlineKeyboard()
-    .webApp('Открыть Web App', 'https://yourdomain.com/webapp/index.html'); // Замените на ваш домен
-
   await ctx.reply(
-    'Привет! Это Telegram бот с Web App. Нажмите кнопку ниже, чтобы открыть веб-приложение.\n\n' +
+    'Привет! Это Telegram бот для получения данных из Google Таблиц.\n\n' +
     'Доступные команды:\n' +
     '/getsheetsdata - получить данные из Google Sheets\n' +
-    '/sheetsmeta - получить метаданные таблицы',
-    {
-      reply_markup: keyboard,
-    }
+    '/sheetsmeta - получить метаданные таблицы'
   );
 });
 
-// Обработка данных, полученных от Web App
-bot.on('msg:web_app_data', async (ctx) => {
+// Команда для получения данных из Google Sheets
+bot.command('getsheetsdata', async (ctx) => {
   // Проверяем доступ
   if (!checkAccess(ctx)) {
     return;
   }
 
   try {
-    // Используем специальный middleware для обработки данных Web App
-    const data = JSON.parse(ctx.message.webAppData.data);
+    // В реальном приложении spreadsheetId и range могут передаваться как параметры команды
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID; // ID таблицы из .env
+    const range = process.env.GOOGLE_SHEETS_RANGE || 'A1:Z100'; // Диапазон из .env или по умолчанию
 
-    if (data.action === 'send_message') {
-      await ctx.reply(`Сообщение получено из Web App! Время: ${data.timestamp}, Сообщение: ${data.message}`);
+    if (!spreadsheetId) {
+      await ctx.reply('❌ ID таблицы Google Sheets не указан в настройках бота.');
+      return;
+    }
+
+    // Запрашиваем данные с сервера
+    const response = await fetch(`http://localhost:${process.env.PORT || 3000}/api/sheets-external/${spreadsheetId}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      if (result.data && result.data.length > 0) {
+        await ctx.reply(
+          `✅ Данные из Google Sheets успешно получены!\n\n` +
+          `📋 Найдено строк: ${result.data.length}`
+        );
+
+        // Отправляем первые несколько строк в качестве примера
+        const sampleData = result.data.slice(0, 5); // первые 5 строк
+        await ctx.reply(`Пример данных:\n${JSON.stringify(sampleData, null, 2)}`);
+      } else {
+        await ctx.reply('⚠️ В указанном диапазоне не найдено данных.');
+      }
     } else {
-      await ctx.reply(`Получены данные из Web App: ${JSON.stringify(data)}`);
+      await ctx.reply(`❌ Ошибка при получении данных из Google Sheets: ${result.message || result.error}`);
     }
   } catch (error) {
-    console.error('Ошибка при обработке данных из Web App:', error);
-    await ctx.reply('Произошла ошибка при обработке данных из Web App.');
+    console.error('Ошибка в команде /getsheetsdata:', error);
+    await ctx.reply('❌ Произошла ошибка при попытке получить данные из Google Sheets.');
+  }
+});
+
+// Команда для получения метаданных таблицы
+bot.command('sheetsmeta', async (ctx) => {
+  // Проверяем доступ
+  if (!checkAccess(ctx)) {
+    return;
+  }
+
+  try {
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+
+    if (!spreadsheetId) {
+      await ctx.reply('❌ ID таблицы Google Sheets не указан в настройках бота.');
+      return;
+    }
+
+    // Запрашиваем метаданные с сервера
+    const response = await fetch(`http://localhost:${process.env.PORT || 3000}/api/sheets/${spreadsheetId}/metadata`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      const metadata = result.metadata;
+      let metaMessage = `📋 Метаданные таблицы "${metadata.properties.title}":\n\n`;
+      metaMessage += `🆔 ID таблицы: ${spreadsheetId}\n`;
+      metaMessage += `📝 Название: ${metadata.properties.title}\n\n`;
+      metaMessage += `📚 Листы (${metadata.sheets.length}):\n`;
+
+      metadata.sheets.forEach((sheet, index) => {
+        const properties = sheet.properties;
+        metaMessage += `  ${index + 1}. "${properties.title}" - ${properties.gridProperties.rowCount}×${properties.gridProperties.columnCount}\n`;
+      });
+
+      await ctx.reply(metaMessage);
+    } else {
+      await ctx.reply(`❌ Ошибка при получении метаданных: ${result.message || result.error}`);
+    }
+  } catch (error) {
+    console.error('Ошибка в команде /sheetsmeta:', error);
+    await ctx.reply('❌ Произошла ошибка при попытке получить метаданные Google Sheets.');
   }
 });
 
@@ -81,7 +141,7 @@ bot.on('message', async (ctx) => {
     return;
   }
 
-  await ctx.reply('Привет! Это тестовый ответ от бота.');
+  await ctx.reply('Привет! Используйте команды /getsheetsdata или /sheetsmeta для получения данных из Google Таблиц.');
 });
 
 // Запускаем бота
