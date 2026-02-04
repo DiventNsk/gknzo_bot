@@ -251,7 +251,22 @@ bot.callbackQuery('get_sheets_meta', async (ctx) => {
   }
 });
 
+// Функция для безопасного запуска бота
+async function startBotSafely() {
+  try {
+    // Запускаем бота
+    await bot.start({
+      drop_pending_updates: true,
+    });
+  } catch (error) {
+    console.error('Ошибка при запуске бота:', error);
+    // Повторная попытка через некоторое время
+    setTimeout(() => {
+      console.log('Повторная попытка запуска бота...');
+      startBotSafely();
+    }, 5000);
+  }
+}
+
 // Запускаем бота
-bot.start({
-  drop_pending_updates: true,
-});
+startBotSafely();
