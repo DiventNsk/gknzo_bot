@@ -83,9 +83,38 @@ bot.command('getsheetsdata', async (ctx) => {
           `📋 Найдено строк: ${result.data.length}`
         );
 
-        // Отправляем первые несколько строк в качестве примера
-        const sampleData = result.data.slice(0, 5); // первые 5 строк
-        await ctx.reply(`Пример данных:\n${JSON.stringify(sampleData, null, 2)}`);
+        // Преобразуем данные в более читаемый формат
+        let formattedData = '📋 *Данные из Google Таблицы:*\n\n';
+
+        // Показываем первые 10 строк в более читаемом формате
+        const rowsToShow = result.data.slice(0, 10);
+
+        for (let i = 0; i < rowsToShow.length; i++) {
+          const row = rowsToShow[i];
+
+          // Если строка содержит массив значений
+          if (Array.isArray(row)) {
+            formattedData += `*Строка ${i + 1}:*\n`;
+            row.forEach((cell, idx) => {
+              formattedData += `  • ${cell || 'пусто'}\n`;
+            });
+          } else {
+            // Если строка содержит объект
+            formattedData += `*Запись ${i + 1}:*\n`;
+            Object.entries(row).forEach(([key, value]) => {
+              formattedData += `  • ${key}: ${value || 'пусто'}\n`;
+            });
+          }
+
+          formattedData += '\n';
+        }
+
+        // Добавляем информацию о количестве оставшихся строк
+        if (result.data.length > 10) {
+          formattedData += `... и ещё ${result.data.length - 10} строк(и)\n`;
+        }
+
+        await ctx.reply(formattedData, { parse_mode: 'Markdown' });
       } else {
         await ctx.reply('⚠️ В таблице не найдено данных.');
       }
@@ -210,9 +239,38 @@ bot.hears('📊 Получить данные из Google Sheets', async (ctx) =
           `📋 Найдено строк: ${result.data.length}`
         );
 
-        // Отправляем первые несколько строк в качестве примера
-        const sampleData = result.data.slice(0, 5); // первые 5 строк
-        await ctx.reply(`Пример данных:\n${JSON.stringify(sampleData, null, 2)}`);
+        // Преобразуем данные в более читаемый формат
+        let formattedData = '📋 *Данные из Google Таблицы:*\n\n';
+
+        // Показываем первые 10 строк в более читаемом формате
+        const rowsToShow = result.data.slice(0, 10);
+
+        for (let i = 0; i < rowsToShow.length; i++) {
+          const row = rowsToShow[i];
+
+          // Если строка содержит массив значений
+          if (Array.isArray(row)) {
+            formattedData += `*Строка ${i + 1}:*\n`;
+            row.forEach((cell, idx) => {
+              formattedData += `  • ${cell || 'пусто'}\n`;
+            });
+          } else {
+            // Если строка содержит объект
+            formattedData += `*Запись ${i + 1}:*\n`;
+            Object.entries(row).forEach(([key, value]) => {
+              formattedData += `  • ${key}: ${value || 'пусто'}\n`;
+            });
+          }
+
+          formattedData += '\n';
+        }
+
+        // Добавляем информацию о количестве оставшихся строк
+        if (result.data.length > 10) {
+          formattedData += `... и ещё ${result.data.length - 10} строк(и)\n`;
+        }
+
+        await ctx.reply(formattedData, { parse_mode: 'Markdown' });
       } else {
         await ctx.reply('⚠️ В таблице не найдено данных.');
       }
