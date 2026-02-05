@@ -252,6 +252,7 @@ const renderForm = () => {
 
 
         <!-- KPI -->
+        ${state.department !== 'ГИ' ? `
         <section class="space-y-4">
             <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide"><i data-lucide="bar-chart-3" class="text-blue-600"></i>Показатели</h2>
             <div class="bg-white border-2 border-slate-300">
@@ -259,7 +260,7 @@ const renderForm = () => {
                  ${renderKpiRow('meetings', 'Планерки', 'users', 'blue')}
                  ${renderKpiRow('training', 'Обучение', 'graduation-cap', 'blue')}
             </div>
-        </section>
+        </section>` : ''}
 
         <!-- Tasks -->
         <section class="space-y-4">
@@ -321,11 +322,11 @@ const renderTaskRow = (task, index) => {
                 <textarea rows="1" oninput="updateTask('${task.id}', 'task_text', this.value)" class="w-full px-3 py-2 bg-slate-50 text-slate-900 text-sm md:text-base border-2 border-slate-200 focus:bg-white focus:outline-none focus:border-indigo-600 resize-none overflow-hidden min-h-[42px]" placeholder="Суть задачи">${task.task_text}</textarea>
             </div>
             <div class="md:col-span-3">
-                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Продукт</label>
+                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Результат</label>
                 <textarea rows="1" oninput="updateTask('${task.id}', 'product', this.value)" class="w-full px-3 py-2 bg-slate-50 text-slate-900 text-sm md:text-base border-2 border-slate-200 focus:bg-white focus:outline-none focus:border-indigo-600 resize-none overflow-hidden min-h-[42px]" placeholder="Ожидаемый итог">${task.product}</textarea>
             </div>
             <div class="md:col-span-3">
-                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Результат</label>
+                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Статус</label>
                 <div class="relative">
                     <select onchange="updateTask('${task.id}', 'status', this.value)" class="w-full px-3 py-2 h-[42px] border-2 appearance-none text-sm md:text-base font-bold focus:outline-none ${status.color}">
                         ${STATUS_OPTIONS.map(opt => `<option value="${opt.value}" class="bg-white text-slate-900" ${task.status === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('')}
@@ -353,7 +354,7 @@ const renderUnplannedRow = (task) => {
            <textarea rows="1" oninput="updateUnplanned('${task.id}', 'task_text', this.value)" class="w-full px-3 py-2 bg-transparent text-slate-900 text-sm md:text-base border-b-2 border-slate-200 focus:border-amber-500 focus:outline-none resize-none overflow-hidden min-h-[42px]" placeholder="Что прилетело внезапно?">${task.task_text}</textarea>
         </div>
         <div class="md:col-span-4 w-full">
-          <textarea rows="1" oninput="updateUnplanned('${task.id}', 'product', this.value)" class="w-full px-3 py-2 bg-transparent text-slate-900 text-sm md:text-base border-b-2 border-slate-200 focus:border-amber-500 focus:outline-none resize-none overflow-hidden min-h-[42px]" placeholder="Продукт (итог)">${task.product}</textarea>
+          <textarea rows="1" oninput="updateUnplanned('${task.id}', 'product', this.value)" class="w-full px-3 py-2 bg-transparent text-slate-900 text-sm md:text-base border-b-2 border-slate-200 focus:border-amber-500 focus:outline-none resize-none overflow-hidden min-h-[42px]" placeholder="Результат (итог)">${task.product}</textarea>
         </div>
         <div class="md:col-span-3 flex gap-2 items-start">
           <div class="relative flex-grow">
@@ -474,19 +475,20 @@ const renderReportItem = (report) => {
              </div>
              
              <!-- KPIs -->
+             ${report.department !== 'ГИ' ? `
              <div>
                 <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Показатели</h4>
                 <div class="grid grid-cols-1 gap-3">
                     ${['deals', 'meetings', 'training'].map(k => {
                         const item = report.kpi_indicators[k];
                         if (item.quantity === 0 && !item.description) return '';
-                        return `<div class="bg-white p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-2">
-                            <div class="flex items-center gap-3 shrink-0"><span class="text-slate-800 font-bold uppercase text-sm w-24">${k}</span><span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 font-bold border border-blue-200">${item.quantity}</span></div>
-                            <span class="text-sm text-slate-600 font-mono border-l-2 border-slate-100 pl-3 w-full">${item.description}</span>
-                        </div>`;
+                        return \`<div class="bg-white p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-2">
+                            <div class="flex items-center gap-3 shrink-0"><span class="text-slate-800 font-bold uppercase text-sm w-24">\${k}</span><span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 font-bold border border-blue-200">\${item.quantity}</span></div>
+                            <span class="text-sm text-slate-600 font-mono border-l-2 border-slate-100 pl-3 w-full">\${item.description}</span>
+                        </div>\`;
                     }).join('')}
                 </div>
-             </div>
+             </div>` : ''}
 
              <!-- Tasks (Numbered) -->
              <div class="mt-8">
@@ -503,7 +505,7 @@ const renderReportItem = (report) => {
                             <span class="shrink-0 text-[10px] uppercase font-bold px-3 py-1.5 border rounded-sm ${STATUS_OPTIONS.find(s=>s.value===t.status)?.color}">${t.status}</span>
                         </div>
                         <div class="text-sm text-slate-600 mb-2 font-mono bg-slate-50 p-2 border border-slate-100 inline-block w-full">
-                            <span class="font-bold text-[10px] uppercase text-slate-400 mr-2 block mb-1">Продукт:</span>${t.product}
+                            <span class="font-bold text-[10px] uppercase text-slate-400 mr-2 block mb-1">Результат:</span>${t.product}
                         </div>
                     </div>`).join('')}
                 </div>
@@ -521,7 +523,7 @@ const renderReportItem = (report) => {
                                  <span class="text-amber-700/50 font-mono font-bold text-sm">${idx + 1}.</span>
                                  <span class="text-slate-800 text-sm font-bold">${t.task_text}</span>
                              </div>
-                             <span class="text-slate-500 text-xs italic mt-1 pl-5">Продукт: ${t.product}</span>
+                             <span class="text-slate-500 text-xs italic mt-1 pl-5">Результат: ${t.product}</span>
                          </div>
                          <span class="shrink-0 text-[10px] uppercase font-bold px-3 py-1.5 border rounded-sm ${STATUS_OPTIONS.find(s=>s.value===t.status)?.color}">${t.status}</span>
                      </div>`).join('')}

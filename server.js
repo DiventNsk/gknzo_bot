@@ -54,16 +54,18 @@ async function sendToTelegram(reportData) {
         message += `📅 Период: ${reportData.period.week_dates}\n`;
         message += `📈 Тип отчета: ${reportData.report_type === 'weekly' ? 'Недельный' : 'Месячный'}\n\n`;
 
-        // Add KPIs
-        message += `<b>🎯 Показатели:</b>\n`;
-        if (reportData.kpi_indicators.deals.quantity > 0) {
-            message += `🔹 Сделки: ${reportData.kpi_indicators.deals.quantity} (${reportData.kpi_indicators.deals.description})\n`;
-        }
-        if (reportData.kpi_indicators.meetings.quantity > 0) {
-            message += `🔹 Планерки: ${reportData.kpi_indicators.meetings.quantity} (${reportData.kpi_indicators.meetings.description})\n`;
-        }
-        if (reportData.kpi_indicators.training.quantity > 0) {
-            message += `🔹 Обучение: ${reportData.kpi_indicators.training.quantity} (${reportData.kpi_indicators.training.description})\n`;
+        // Add KPIs only if department is not ГИ
+        if (reportData.department !== 'ГИ') {
+            message += `<b>🎯 Показатели:</b>\n`;
+            if (reportData.kpi_indicators.deals.quantity > 0) {
+                message += `🔹 Сделки: ${reportData.kpi_indicators.deals.quantity} (${reportData.kpi_indicators.deals.description})\n`;
+            }
+            if (reportData.kpi_indicators.meetings.quantity > 0) {
+                message += `🔹 Планерки: ${reportData.kpi_indicators.meetings.quantity} (${reportData.kpi_indicators.meetings.description})\n`;
+            }
+            if (reportData.kpi_indicators.training.quantity > 0) {
+                message += `🔹 Обучение: ${reportData.kpi_indicators.training.quantity} (${reportData.kpi_indicators.training.description})\n`;
+            }
         }
 
         // Add tasks
@@ -72,7 +74,7 @@ async function sendToTelegram(reportData) {
             reportData.tasks.forEach((task, index) => {
                 message += `${index + 1}. <b>${task.task_text}</b> - ${task.status}\n`;
                 if (task.product) {
-                    message += `   Продукт: ${task.product}\n`;
+                    message += `   Результат: ${task.product}\n`;
                 }
                 if (task.comment) {
                     message += `   Комментарий: ${task.comment}\n`;
@@ -86,7 +88,7 @@ async function sendToTelegram(reportData) {
             reportData.unplanned_tasks.forEach((task, index) => {
                 message += `${index + 1}. <b>${task.task_text}</b> - ${task.status}\n`;
                 if (task.product) {
-                    message += `   Продукт: ${task.product}\n`;
+                    message += `   Результат: ${task.product}\n`;
                 }
             });
         }
