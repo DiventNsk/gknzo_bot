@@ -482,10 +482,10 @@ const renderReportItem = (report) => {
                     ${['deals', 'meetings', 'training'].map(k => {
                         const item = report.kpi_indicators[k];
                         if (item.quantity === 0 && !item.description) return '';
-                        return \`<div class="bg-white p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-2">
+                        return `<div class="bg-white p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-2">
                             <div class="flex items-center gap-3 shrink-0"><span class="text-slate-800 font-bold uppercase text-sm w-24">\${k}</span><span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 font-bold border border-blue-200">\${item.quantity}</span></div>
                             <span class="text-sm text-slate-600 font-mono border-l-2 border-slate-100 pl-3 w-full">\${item.description}</span>
-                        </div>\`;
+                        </div>`;
                     }).join('')}
                 </div>
              </div>` : ''}
