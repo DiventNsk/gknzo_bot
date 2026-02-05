@@ -25,6 +25,21 @@ const state = {
         meetings: { quantity: 0, description: '' },
         training: { quantity: 0, description: '' },
     },
+    // Special fields for КД department
+    kdIndicators: {
+        contracts_count: { quantity: 0, description: '' },
+        contracts_amount: { quantity: 0, description: '' },
+        deals_in_work: { quantity: 0, amount: 0, description: '' },
+        tenders_in_work: { quantity: 0, amount: 0, description: '' },
+        effective_calls: { quantity: 0, description: '' },
+        tcp_sent: { quantity: 0, description: '' },
+        turnover_plan: { quantity: 0, description: '' },
+        margin_plan: { quantity: 0, description: '' },
+        meetings_op: { quantity: 0, description: '' },
+        trainings_op: { quantity: 0, description: '' },
+        applications_tki: { quantity: 0, description: '' },
+        calculated_applications: { quantity: 0, description: '' }
+    },
     tasks: [],
     unplannedTasks: [],
 
@@ -252,7 +267,25 @@ const renderForm = () => {
 
 
         <!-- KPI -->
-        ${state.department !== 'ГИ' ? `
+        ${state.department === 'КД' ? `
+        <section class="space-y-4">
+            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide"><i data-lucide="bar-chart-3" class="text-blue-600"></i>Показатели</h2>
+            <div class="bg-white border-2 border-slate-300 space-y-0 divide-y divide-slate-200">
+                ${renderKdIndicatorRow('contracts_count', 'Количество заключенных контрактов', 'file-text', 'blue')}
+                ${renderKdIndicatorRow('contracts_amount', 'Сумма заключенных контрактов', 'dollar-sign', 'blue')}
+                ${renderKdDoubleIndicatorRow('deals_in_work', 'Сделок в работе МОП ОП (шт/руб)', 'trending-up', 'blue')}
+                ${renderKdDoubleIndicatorRow('tenders_in_work', 'Количество всех тендеров в работе (шт/руб)', 'briefcase', 'blue')}
+                ${renderKdIndicatorRow('effective_calls', 'Количество результативных звонков ОП', 'phone', 'blue')}
+                ${renderKdIndicatorRow('tcp_sent', 'Количество направленных ТКП', 'send', 'blue')}
+                ${renderKdIndicatorRow('turnover_plan', 'Выполнение плана в оборот 60 000 млн', 'target', 'blue')}
+                ${renderKdIndicatorRow('margin_plan', 'Выполнение плана маржинальность', 'percent', 'blue')}
+                ${renderKdIndicatorRow('meetings_op', 'Количество планерок в ОП за месяц', 'users', 'blue')}
+                ${renderKdIndicatorRow('trainings_op', 'Количество обучений в ОП за месяц', 'graduation-cap', 'blue')}
+                ${renderKdIndicatorRow('applications_tki', 'Получено заявок в расчет ТКИ', 'clipboard', 'blue')}
+                ${renderKdIndicatorRow('calculated_applications', 'Рассчитано заявок', 'calculator', 'blue')}
+            </div>
+        </section>
+        ` : state.department !== 'ГИ' ? `
         <section class="space-y-4">
             <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide"><i data-lucide="bar-chart-3" class="text-blue-600"></i>Показатели</h2>
             <div class="bg-white border-2 border-slate-300">
@@ -307,6 +340,86 @@ const renderKpiRow = (key, title, icon, color) => {
             <textarea rows="1" oninput="updateKpi('${key}', 'description', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-3 py-2 bg-white text-slate-900 text-base border-2 border-slate-300 focus:outline-none focus:border-blue-600 resize-none overflow-hidden min-h-[42px] leading-normal" placeholder="Описание">${state.kpis[key].description}</textarea>
         </div>
     </div>`;
+};
+
+// Render KD indicator row (single input)
+const renderKdIndicatorRow = (key, title, icon, color) => {
+    return `
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-start md:items-center p-3 md:p-4 hover:bg-slate-50">
+        <div class="md:col-span-3 flex items-center gap-3 font-bold text-slate-700 mb-2 md:mb-0">
+            <div class="p-2 shrink-0 border bg-${color}-100 text-${color}-700 border-${color}-200"><i data-lucide="${icon}" class="w-5 h-5"></i></div>
+            <span class="text-base uppercase tracking-tight">${title}</span>
+        </div>
+        <div class="md:col-span-2 w-full">
+            <input type="number" value="${state.kdIndicators[key].quantity}" oninput="updateKdIndicator('${key}', 'quantity', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-3 py-2 bg-white text-slate-900 text-base border-2 border-slate-300 focus:outline-none focus:border-blue-600 font-mono text-center h-[42px]" placeholder="0">
+        </div>
+        <div class="md:col-span-7 w-full">
+            <textarea rows="1" oninput="updateKdIndicator('${key}', 'description', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-3 py-2 bg-white text-slate-900 text-base border-2 border-slate-300 focus:outline-none focus:border-blue-600 resize-none overflow-hidden min-h-[42px] leading-normal" placeholder="Описание">${state.kdIndicators[key].description}</textarea>
+        </div>
+    </div>`;
+};
+
+// Render KD double indicator row (quantity and amount inputs)
+const renderKdDoubleIndicatorRow = (key, title, icon, color) => {
+    return `
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-start md:items-center p-3 md:p-4 hover:bg-slate-50">
+        <div class="md:col-span-3 flex items-center gap-3 font-bold text-slate-700 mb-2 md:mb-0">
+            <div class="p-2 shrink-0 border bg-${color}-100 text-${color}-700 border-${color}-200"><i data-lucide="${icon}" class="w-5 h-5"></i></div>
+            <span class="text-base uppercase tracking-tight">${title}</span>
+        </div>
+        <div class="md:col-span-2 w-full grid grid-cols-2 gap-2">
+            <input type="number" value="${state.kdIndicators[key].quantity}" oninput="updateKdIndicator('${key}', 'quantity', this.value)" ${state.isLocked ? 'disabled' : ''} class="px-2 py-2 bg-white text-slate-900 text-sm border-2 border-slate-300 focus:outline-none focus:border-blue-600 font-mono text-center" placeholder="шт">
+            <input type="number" value="${state.kdIndicators[key].amount}" oninput="updateKdIndicator('${key}', 'amount', this.value)" ${state.isLocked ? 'disabled' : ''} class="px-2 py-2 bg-white text-slate-900 text-sm border-2 border-slate-300 focus:outline-none focus:border-blue-600 font-mono text-center" placeholder="руб">
+        </div>
+        <div class="md:col-span-7 w-full">
+            <textarea rows="1" oninput="updateKdIndicator('${key}', 'description', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-3 py-2 bg-white text-slate-900 text-base border-2 border-slate-300 focus:outline-none focus:border-blue-600 resize-none overflow-hidden min-h-[42px] leading-normal" placeholder="Описание">${state.kdIndicators[key].description}</textarea>
+        </div>
+    </div>`;
+};
+
+// Render KD indicators for report view
+const renderKdReportIndicators = (report) => {
+    const indicators = [
+        { key: 'contracts_count', title: 'Количество заключенных контрактов', icon: 'file-text' },
+        { key: 'contracts_amount', title: 'Сумма заключенных контрактов', icon: 'dollar-sign' },
+        { key: 'deals_in_work', title: 'Сделок в работе МОП ОП (шт/руб)', icon: 'trending-up' },
+        { key: 'tenders_in_work', title: 'Количество всех тендеров в работе (шт/руб)', icon: 'briefcase' },
+        { key: 'effective_calls', title: 'Количество результативных звонков ОП', icon: 'phone' },
+        { key: 'tcp_sent', title: 'Количество направленных ТКП', icon: 'send' },
+        { key: 'turnover_plan', title: 'Выполнение плана в оборот 60 000 млн', icon: 'target' },
+        { key: 'margin_plan', title: 'Выполнение плана маржинальность', icon: 'percent' },
+        { key: 'meetings_op', title: 'Количество планерок в ОП за месяц', icon: 'users' },
+        { key: 'trainings_op', title: 'Количество обучений в ОП за месяц', icon: 'graduation-cap' },
+        { key: 'applications_tki', title: 'Получено заявок в расчет ТКИ', icon: 'clipboard' },
+        { key: 'calculated_applications', title: 'Рассчитано заявок', icon: 'calculator' }
+    ];
+
+    return indicators.map(indicator => {
+        const data = report.kd_indicators[indicator.key];
+        if (!data && typeof data !== 'object') return '';
+        
+        // Handle both single value and double value indicators
+        if (data && data.amount !== undefined) {
+            // Double indicator (with quantity and amount)
+            return `<div class="bg-white p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-2">
+                <div class="flex items-center gap-3 shrink-0">
+                    <span class="text-slate-800 font-bold uppercase text-sm w-48">\${indicator.title}</span>
+                    <span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 font-bold border border-blue-200">\${data.quantity || 0}</span>
+                    <span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 font-bold border border-blue-200">\${data.amount || 0}</span>
+                </div>
+                <span class="text-sm text-slate-600 font-mono border-l-2 border-slate-100 pl-3 w-full">\${data.description || ''}</span>
+            </div>`;
+        } else {
+            // Single indicator (with just quantity)
+            return `<div class="bg-white p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-start justify-between gap-2">
+                <div class="flex items-center gap-3 shrink-0">
+                    <span class="text-slate-800 font-bold uppercase text-sm w-48">\${indicator.title}</span>
+                    <span class="bg-blue-100 text-blue-800 text-xs px-3 py-1 font-bold border border-blue-200">\${data.quantity || 0}</span>
+                </div>
+                <span class="text-sm text-slate-600 font-mono border-l-2 border-slate-100 pl-3 w-full">\${data.description || ''}</span>
+            </div>`;
+        }
+    }).join('');
 };
 
 const renderTaskRow = (task, index) => {
@@ -475,7 +588,14 @@ const renderReportItem = (report) => {
              </div>
              
              <!-- KPIs -->
-             ${report.department !== 'ГИ' ? `
+             ${report.department === 'КД' ? `
+             <div>
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Показатели</h4>
+                <div class="grid grid-cols-1 gap-3">
+                    ${renderKdReportIndicators(report)}
+                </div>
+             </div>
+             ` : report.department !== 'ГИ' ? `
              <div>
                 <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Показатели</h4>
                 <div class="grid grid-cols-1 gap-3">
@@ -545,7 +665,56 @@ window.selectDept = (dept) => {
     state.department = dept;
     state.reportType = 'weekly';
     state.period.week_dates = getWeekRange();
-    state.tasks = [{ id: generateId(), task_text: '', product: '', status: 'Без статуса', comment: '' }];
+    
+    // Initialize department-specific fields
+    if (dept === 'КД') {
+        // Reset KD indicators to default values
+        state.kdIndicators = {
+            contracts_count: { quantity: 0, description: '' },
+            contracts_amount: { quantity: 0, description: '' },
+            deals_in_work: { quantity: 0, amount: 0, description: '' },
+            tenders_in_work: { quantity: 0, amount: 0, description: '' },
+            effective_calls: { quantity: 0, description: '' },
+            tcp_sent: { quantity: 0, description: '' },
+            turnover_plan: { quantity: 0, description: '' },
+            margin_plan: { quantity: 0, description: '' },
+            meetings_op: { quantity: 0, description: '' },
+            trainings_op: { quantity: 0, description: '' },
+            applications_tki: { quantity: 0, description: '' },
+            calculated_applications: { quantity: 0, description: '' }
+        };
+        state.tasks = []; // Clear regular tasks for КД department
+        state.kpis = { // Reset regular KPIs
+            deals: { quantity: 0, description: '' },
+            meetings: { quantity: 0, description: '' },
+            training: { quantity: 0, description: '' },
+        };
+    } else if (dept === 'ГИ') {
+        state.tasks = []; // Clear regular tasks for ГИ department
+        state.kpis = { // Reset regular KPIs
+            deals: { quantity: 0, description: '' },
+            meetings: { quantity: 0, description: '' },
+            training: { quantity: 0, description: '' },
+        };
+    } else {
+        state.tasks = [{ id: generateId(), task_text: '', product: '', status: 'Без статуса', comment: '' }];
+        // Reset KD indicators for other departments
+        state.kdIndicators = {
+            contracts_count: { quantity: 0, description: '' },
+            contracts_amount: { quantity: 0, description: '' },
+            deals_in_work: { quantity: 0, amount: 0, description: '' },
+            tenders_in_work: { quantity: 0, amount: 0, description: '' },
+            effective_calls: { quantity: 0, description: '' },
+            tcp_sent: { quantity: 0, description: '' },
+            turnover_plan: { quantity: 0, description: '' },
+            margin_plan: { quantity: 0, description: '' },
+            meetings_op: { quantity: 0, description: '' },
+            trainings_op: { quantity: 0, description: '' },
+            applications_tki: { quantity: 0, description: '' },
+            calculated_applications: { quantity: 0, description: '' }
+        };
+    }
+
     state.editingId = null;
     navigate('create');
 };
@@ -558,6 +727,7 @@ window.toggleType = (type) => {
 
 window.updatePeriod = (val) => { state.period.week_dates = val; state.period.is_manual = true; };
 window.updateKpi = (key, field, val) => { state.kpis[key][field] = val; };
+window.updateKdIndicator = (key, field, val) => { state.kdIndicators[key][field] = val; };
 window.addTask = () => { state.tasks.push({ id: generateId(), task_text: '', product: '', status: 'Без статуса', comment: '' }); render(); };
 window.removeTask = (id) => { state.tasks = state.tasks.filter(t => t.id !== id); render(); };
 window.updateTask = (id, field, val) => { const t = state.tasks.find(x => x.id === id); if(t) t[field] = val; };
@@ -581,7 +751,43 @@ window.editReport = (id) => {
     state.department = report.department;
     state.reportType = report.report_type;
     state.period = report.period;
-    state.kpis = JSON.parse(JSON.stringify(report.kpi_indicators));
+    
+    // Load department-specific indicators
+    if (report.department === 'КД') {
+        state.kdIndicators = JSON.parse(JSON.stringify(report.kd_indicators || {
+            contracts_count: { quantity: 0, description: '' },
+            contracts_amount: { quantity: 0, description: '' },
+            deals_in_work: { quantity: 0, amount: 0, description: '' },
+            tenders_in_work: { quantity: 0, amount: 0, description: '' },
+            effective_calls: { quantity: 0, description: '' },
+            tcp_sent: { quantity: 0, description: '' },
+            turnover_plan: { quantity: 0, description: '' },
+            margin_plan: { quantity: 0, description: '' },
+            meetings_op: { quantity: 0, description: '' },
+            trainings_op: { quantity: 0, description: '' },
+            applications_tki: { quantity: 0, description: '' },
+            calculated_applications: { quantity: 0, description: '' }
+        }));
+        state.kpis = JSON.parse(JSON.stringify(report.kpi_indicators));
+    } else {
+        state.kpis = JSON.parse(JSON.stringify(report.kpi_indicators));
+        // Reset KD indicators for non-KD departments
+        state.kdIndicators = {
+            contracts_count: { quantity: 0, description: '' },
+            contracts_amount: { quantity: 0, description: '' },
+            deals_in_work: { quantity: 0, amount: 0, description: '' },
+            tenders_in_work: { quantity: 0, amount: 0, description: '' },
+            effective_calls: { quantity: 0, description: '' },
+            tcp_sent: { quantity: 0, description: '' },
+            turnover_plan: { quantity: 0, description: '' },
+            margin_plan: { quantity: 0, description: '' },
+            meetings_op: { quantity: 0, description: '' },
+            trainings_op: { quantity: 0, description: '' },
+            applications_tki: { quantity: 0, description: '' },
+            calculated_applications: { quantity: 0, description: '' }
+        };
+    }
+    
     // Re-generate IDs for UI logic
     state.tasks = report.tasks.map(t => ({...t, id: generateId()}));
     state.unplannedTasks = report.unplanned_tasks.map(t => ({...t, id: generateId()}));
@@ -624,61 +830,183 @@ window.submitReport = async () => {
     state.isSubmitting = true;
     render(); // Update button state
 
-    const validTasks = state.tasks.filter(t => t.task_text.trim());
-    const validUnplanned = state.unplannedTasks.filter(t => t.task_text.trim());
+    // Handle department-specific form data
+    if (state.department === 'КД') {
+        // For КД department, use kdIndicators instead of regular kpis
+        const validTasks = state.tasks.filter(t => t.task_text.trim()); // КД can still have tasks
+        const validUnplanned = state.unplannedTasks.filter(t => t.task_text.trim());
 
-    // Check for merge
-    const existing = state.history.find(r => r.department === state.department && r.report_type === state.reportType && r.period.week_dates === state.period.week_dates);
+        // Check for merge
+        const existing = state.history.find(r => r.department === state.department && r.report_type === state.reportType && r.period.week_dates === state.period.week_dates);
 
-    let finalPayload = {
-        department: state.department,
-        report_type: state.reportType,
-        period: state.period,
-        kpi_indicators: state.kpis,
-        tasks: validTasks, // IDs will be stripped on server or here. Just sending as is for now.
-        unplanned_tasks: validUnplanned,
-        calculated_stats: {
-             done: validTasks.filter(t => t.status === 'Выполнено').length,
-             total: validTasks.length,
-             percent: validTasks.length > 0 ? Math.round((validTasks.filter(t => t.status === 'Выполнено').length / validTasks.length) * 100) : 0
-        },
-        id: generateId(),
-        created_at: new Date().toISOString()
-    };
-
-    if (state.editingId) {
-        // Full overwrite
-        finalPayload.id = state.editingId;
-    } else if (existing) {
-        // Merge
-        const mergedTasks = [...existing.tasks, ...validTasks];
-        const mergedUnplanned = [...existing.unplanned_tasks, ...validUnplanned];
-        finalPayload.id = existing.id; // Keep old ID
-        finalPayload.created_at = new Date().toISOString();
-        finalPayload.tasks = mergedTasks;
-        finalPayload.unplanned_tasks = mergedUnplanned;
-        finalPayload.calculated_stats = {
-             done: mergedTasks.filter(t => t.status === 'Выполнено').length,
-             total: mergedTasks.length,
-             percent: mergedTasks.length > 0 ? Math.round((mergedTasks.filter(t => t.status === 'Выполнено').length / mergedTasks.length) * 100) : 0
+        let finalPayload = {
+            department: state.department,
+            report_type: state.reportType,
+            period: state.period,
+            kd_indicators: state.kdIndicators, // Department-specific indicators
+            kpi_indicators: state.kpis, // Regular KPIs (should be empty for КД but kept for consistency)
+            tasks: validTasks,
+            unplanned_tasks: validUnplanned,
+            calculated_stats: {
+                 done: validTasks.filter(t => t.status === 'Выполнено').length,
+                 total: validTasks.length,
+                 percent: validTasks.length > 0 ? Math.round((validTasks.filter(t => t.status === 'Выполнено').length / validTasks.length) * 100) : 0
+            },
+            id: generateId(),
+            created_at: new Date().toISOString()
         };
-    }
 
-    try {
-        await fetch('/api/reports', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(finalPayload)
-        });
-        await api.fetchReports(); // Refresh
-        alert('Сохранено!');
-        state.editingId = null;
-        navigate('dashboard');
-    } catch(e) {
-        alert('Ошибка');
-    } finally {
-        state.isSubmitting = false;
-        render();
+        if (state.editingId) {
+            // Full overwrite
+            finalPayload.id = state.editingId;
+        } else if (existing) {
+            // Merge
+            const mergedTasks = [...existing.tasks, ...validTasks];
+            const mergedUnplanned = [...existing.unplanned_tasks, ...validUnplanned];
+            finalPayload.id = existing.id; // Keep old ID
+            finalPayload.created_at = new Date().toISOString();
+            finalPayload.tasks = mergedTasks;
+            finalPayload.unplanned_tasks = mergedUnplanned;
+            finalPayload.calculated_stats = {
+                 done: mergedTasks.filter(t => t.status === 'Выполнено').length,
+                 total: mergedTasks.length,
+                 percent: mergedTasks.length > 0 ? Math.round((mergedTasks.filter(t => t.status === 'Выполнено').length / mergedTasks.length) * 100) : 0
+            };
+        }
+
+        try {
+            await fetch('/api/reports', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(finalPayload)
+            });
+            await api.fetchReports(); // Refresh
+            alert('Сохранено!');
+            state.editingId = null;
+            navigate('dashboard');
+        } catch(e) {
+            alert('Ошибка');
+        } finally {
+            state.isSubmitting = false;
+            render();
+        }
+    } else if (state.department === 'ГИ') {
+        // For ГИ department, skip regular tasks and KPIs
+        // (keeping the previous ГИ logic if it exists)
+        const validTasks = state.tasks.filter(t => t.task_text.trim());
+        const validUnplanned = state.unplannedTasks.filter(t => t.task_text.trim());
+
+        // Check for merge
+        const existing = state.history.find(r => r.department === state.department && r.report_type === state.reportType && r.period.week_dates === state.period.week_dates);
+
+        let finalPayload = {
+            department: state.department,
+            report_type: state.reportType,
+            period: state.period,
+            kpi_indicators: state.kpis,
+            tasks: validTasks,
+            unplanned_tasks: validUnplanned,
+            calculated_stats: {
+                 done: validTasks.filter(t => t.status === 'Выполнено').length,
+                 total: validTasks.length,
+                 percent: validTasks.length > 0 ? Math.round((validTasks.filter(t => t.status === 'Выполнено').length / validTasks.length) * 100) : 0
+            },
+            id: generateId(),
+            created_at: new Date().toISOString()
+        };
+
+        if (state.editingId) {
+            // Full overwrite
+            finalPayload.id = state.editingId;
+        } else if (existing) {
+            // Merge
+            const mergedTasks = [...existing.tasks, ...validTasks];
+            const mergedUnplanned = [...existing.unplanned_tasks, ...validUnplanned];
+            finalPayload.id = existing.id; // Keep old ID
+            finalPayload.created_at = new Date().toISOString();
+            finalPayload.tasks = mergedTasks;
+            finalPayload.unplanned_tasks = mergedUnplanned;
+            finalPayload.calculated_stats = {
+                 done: mergedTasks.filter(t => t.status === 'Выполнено').length,
+                 total: mergedTasks.length,
+                 percent: mergedTasks.length > 0 ? Math.round((mergedTasks.filter(t => t.status === 'Выполнено').length / mergedTasks.length) * 100) : 0
+            };
+        }
+
+        try {
+            await fetch('/api/reports', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(finalPayload)
+            });
+            await api.fetchReports(); // Refresh
+            alert('Сохранено!');
+            state.editingId = null;
+            navigate('dashboard');
+        } catch(e) {
+            alert('Ошибка');
+        } finally {
+            state.isSubmitting = false;
+            render();
+        }
+    } else {
+        // Original logic for other departments
+        const validTasks = state.tasks.filter(t => t.task_text.trim());
+        const validUnplanned = state.unplannedTasks.filter(t => t.task_text.trim());
+
+        // Check for merge
+        const existing = state.history.find(r => r.department === state.department && r.report_type === state.reportType && r.period.week_dates === state.period.week_dates);
+
+        let finalPayload = {
+            department: state.department,
+            report_type: state.reportType,
+            period: state.period,
+            kpi_indicators: state.kpis,
+            tasks: validTasks, // IDs will be stripped on server or here. Just sending as is for now.
+            unplanned_tasks: validUnplanned,
+            calculated_stats: {
+                 done: validTasks.filter(t => t.status === 'Выполнено').length,
+                 total: validTasks.length,
+                 percent: validTasks.length > 0 ? Math.round((validTasks.filter(t => t.status === 'Выполнено').length / validTasks.length) * 100) : 0
+            },
+            id: generateId(),
+            created_at: new Date().toISOString()
+        };
+
+        if (state.editingId) {
+            // Full overwrite
+            finalPayload.id = state.editingId;
+        } else if (existing) {
+            // Merge
+            const mergedTasks = [...existing.tasks, ...validTasks];
+            const mergedUnplanned = [...existing.unplanned_tasks, ...validUnplanned];
+            finalPayload.id = existing.id; // Keep old ID
+            finalPayload.created_at = new Date().toISOString();
+            finalPayload.tasks = mergedTasks;
+            finalPayload.unplanned_tasks = mergedUnplanned;
+            finalPayload.calculated_stats = {
+                 done: mergedTasks.filter(t => t.status === 'Выполнено').length,
+                 total: mergedTasks.length,
+                 percent: mergedTasks.length > 0 ? Math.round((mergedTasks.filter(t => t.status === 'Выполнено').length / mergedTasks.length) * 100) : 0
+            };
+        }
+
+        try {
+            await fetch('/api/reports', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(finalPayload)
+            });
+            await api.fetchReports(); // Refresh
+            alert('Сохранено!');
+            state.editingId = null;
+            navigate('dashboard');
+        } catch(e) {
+            alert('Ошибка');
+        } finally {
+            state.isSubmitting = false;
+            render();
+        }
     }
 };
 

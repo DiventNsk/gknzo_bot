@@ -37,8 +37,50 @@ app.post('/api/send-to-telegram', async (req, res) => {
         message += `📅 Период: ${reportData.period?.week_dates || 'Не указан'}\n`;
         message += `📈 Тип отчета: ${reportData.report_type === 'weekly' ? 'Недельный' : 'Месячный'}\n\n`;
 
-        // Добавляем KPIs только если отдел не ГИ
-        if (reportData.department !== 'ГИ') {
+        // Добавляем KPIs based on department
+        if (reportData.department === 'КД') {
+            // Special indicators for КД department
+            message += `<b>🎯 Показатели:</b>\n`;
+            if (reportData.kd_indicators) {
+                if (reportData.kd_indicators.contracts_count.quantity > 0) {
+                    message += `📋 Количество заключенных контрактов: ${reportData.kd_indicators.contracts_count.quantity} (${reportData.kd_indicators.contracts_count.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.contracts_amount.quantity > 0) {
+                    message += `💰 Сумма заключенных контрактов: ${reportData.kd_indicators.contracts_amount.quantity} (${reportData.kd_indicators.contracts_amount.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.deals_in_work.quantity > 0 || reportData.kd_indicators.deals_in_work.amount > 0) {
+                    message += `💼 Сделок в работе МОП ОП: ${reportData.kd_indicators.deals_in_work.quantity} шт / ${reportData.kd_indicators.deals_in_work.amount} руб (${reportData.kd_indicators.deals_in_work.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.tenders_in_work.quantity > 0 || reportData.kd_indicators.tenders_in_work.amount > 0) {
+                    message += `📋 Количество всех тендеров в работе: ${reportData.kd_indicators.tenders_in_work.quantity} шт / ${reportData.kd_indicators.tenders_in_work.amount} руб (${reportData.kd_indicators.tenders_in_work.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.effective_calls.quantity > 0) {
+                    message += `📞 Количество результативных звонков ОП: ${reportData.kd_indicators.effective_calls.quantity} (${reportData.kd_indicators.effective_calls.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.tcp_sent.quantity > 0) {
+                    message += `📤 Количество направленных ТКП: ${reportData.kd_indicators.tcp_sent.quantity} (${reportData.kd_indicators.tcp_sent.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.turnover_plan.quantity > 0) {
+                    message += `🎯 Выполнение плана в оборот 60 000 млн: ${reportData.kd_indicators.turnover_plan.quantity} (${reportData.kd_indicators.turnover_plan.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.margin_plan.quantity > 0) {
+                    message += `📊 Выполнение плана маржинальность: ${reportData.kd_indicators.margin_plan.quantity} (${reportData.kd_indicators.margin_plan.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.meetings_op.quantity > 0) {
+                    message += `👥 Количество планерок в ОП за месяц: ${reportData.kd_indicators.meetings_op.quantity} (${reportData.kd_indicators.meetings_op.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.trainings_op.quantity > 0) {
+                    message += `🎓 Количество обучений в ОП за месяц: ${reportData.kd_indicators.trainings_op.quantity} (${reportData.kd_indicators.trainings_op.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.applications_tki.quantity > 0) {
+                    message += `📝 Получено заявок в расчет ТКИ: ${reportData.kd_indicators.applications_tki.quantity} (${reportData.kd_indicators.applications_tki.description || 'Нет описания'})\n`;
+                }
+                if (reportData.kd_indicators.calculated_applications.quantity > 0) {
+                    message += `🧮 Рассчитано заявок: ${reportData.kd_indicators.calculated_applications.quantity} (${reportData.kd_indicators.calculated_applications.description || 'Нет описания'})\n`;
+                }
+            }
+        } else if (reportData.department !== 'ГИ') {
+            // Regular KPIs for other departments (except ГИ)
             message += `<b>🎯 Показатели:</b>\n`;
             if (reportData.kpi_indicators?.deals?.quantity > 0) {
                 message += `🔹 Сделки: ${reportData.kpi_indicators.deals.quantity} (${reportData.kpi_indicators.deals.description || 'Нет описания'})\n`;
