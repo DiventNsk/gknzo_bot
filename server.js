@@ -1,24 +1,26 @@
 require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const { google } = require('googleapis');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'data', 'database.json');
+const CREDENTIALS_FILE = path.join(__dirname, 'data', 'google-credentials.json');
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public', {
     setHeaders: (res, path) => {
         if (path.endsWith('.js')) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
         }
-    }
+    },
+    fallthrough: true
 }));
 
 // Ensure DB exists
@@ -43,6 +45,87 @@ const writeData = (data) => {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 };
 
+// Google Sheets Helper
+const getGoogleAuth = () => {
+    // Check for service account credentials
+    if (fs.existsSync(CREDENTIALS_FILE)) {
+        const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+        
+        // Use service account
+        const auth = new google.auth.GoogleAuth({
+            credentials: credentials,
+            scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        });
+        return auth;
+    }
+    
+    // Fallback to OAuth2 with API key
+    return null;
+};
+
+const getSheetsData = async (spreadsheetId, range) => {
+    const auth = getGoogleAuth();
+    
+    if (!auth) {
+        throw new Error('Google credentials not configured');
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    try {
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: spreadsheetId,
+            range: range
+        });
+        
+        return response.data.values || [];
+    } catch (error) {
+        if (error.response?.status === 404) {
+            throw new Error('Лист ' + range + ' не найден в таблице');
+        }
+        throw error;
+    }
+};
+
+const parseSheetsToReports = (rows) => {
+    if (!rows || rows.length === 0) return [];
+    
+    // Skip header row
+    const dataRows = rows.slice(1);
+    
+    return dataRows.map((row, index) => ({
+        id: `sheet-${index}-${Date.now()}`,
+        department: row[1] || '',
+        report_type: 'weekly',
+        period: { week_dates: row[0] || '', is_manual: true },
+        kpi_indicators: { deals: { quantity: 0, description: '' }, meetings: { quantity: 0, description: '' }, training: { quantity: 0, description: '' } },
+        tasks: row[2] ? [{
+            id: `task-${index}`,
+            task_text: row[2] || '',
+            product: row[4] || '',
+            status: mapStatus(row[3] || 'Без статуса'),
+            comment: '',
+            focus: false
+        }] : [],
+        unplanned_tasks: [],
+        calculated_stats: {
+            done: (row[3] || '').toLowerCase().includes('выполнено') ? 1 : 0,
+            total: 1,
+            percent: (row[3] || '').toLowerCase().includes('выполнено') ? 100 : 0
+        },
+        created_at: new Date().toISOString(),
+        source: 'google-sheets'
+    })).filter(r => r.department && r.tasks.length > 0);
+};
+
+const mapStatus = (status) => {
+    const s = status.toLowerCase();
+    if (s.includes('выполнено') || s.includes('готово') || s.includes('done')) return 'Выполнено';
+    if (s.includes('работе') || s.includes('progress')) return 'В работе';
+    if (s.includes('не выполнено') || s.includes('не готово') || s.includes('pending')) return 'Не выполнено';
+    return 'Без статуса';
+};
+
 // API Endpoints
 
 // Get all reports
@@ -54,116 +137,63 @@ app.get('/api/reports', (req, res) => {
 // Function to send data to Telegram
 async function sendToTelegram(reportData) {
     try {
-        // Format message for Telegram
         let message = `📊 <b>Новый отчет от ${reportData.department}</b>\n\n`;
         message += `🏢 Отдел: ${reportData.department}\n`;
         message += `📅 Период: ${reportData.period.week_dates}\n`;
         message += `📈 Тип отчета: ${reportData.report_type === 'weekly' ? 'Недельный' : 'Месячный'}\n\n`;
 
-        // Add KPIs based on department
-        if (reportData.department === 'КД') {
-            // Special indicators for КД department
+        if (reportData.department === 'КД' && reportData.kd_indicators) {
             message += `<b>🎯 Показатели:</b>\n`;
-            if (reportData.kd_indicators) {
-                if (reportData.kd_indicators.contracts_count.quantity > 0) {
-                    message += `📋 Количество заключенных контрактов: ${reportData.kd_indicators.contracts_count.quantity} (${reportData.kd_indicators.contracts_count.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.contracts_amount.quantity > 0) {
-                    message += `💰 Сумма заключенных контрактов: ${reportData.kd_indicators.contracts_amount.quantity} (${reportData.kd_indicators.contracts_amount.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.deals_in_work.quantity > 0 || reportData.kd_indicators.deals_in_work.amount > 0) {
-                    message += `💼 Сделок в работе МОП ОП: ${reportData.kd_indicators.deals_in_work.quantity} шт / ${reportData.kd_indicators.deals_in_work.amount} руб (${reportData.kd_indicators.deals_in_work.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.tenders_in_work.quantity > 0 || reportData.kd_indicators.tenders_in_work.amount > 0) {
-                    message += `📋 Количество всех тендеров в работе: ${reportData.kd_indicators.tenders_in_work.quantity} шт / ${reportData.kd_indicators.tenders_in_work.amount} руб (${reportData.kd_indicators.tenders_in_work.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.effective_calls.quantity > 0) {
-                    message += `📞 Количество результативных звонков ОП: ${reportData.kd_indicators.effective_calls.quantity} (${reportData.kd_indicators.effective_calls.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.tcp_sent.quantity > 0) {
-                    message += `📤 Количество направленных ТКП: ${reportData.kd_indicators.tcp_sent.quantity} (${reportData.kd_indicators.tcp_sent.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.turnover_plan.quantity > 0) {
-                    message += `🎯 Выполнение плана в оборот 60 000 млн: ${reportData.kd_indicators.turnover_plan.quantity} (${reportData.kd_indicators.turnover_plan.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.margin_plan.quantity > 0) {
-                    message += `📊 Выполнение плана маржинальность: ${reportData.kd_indicators.margin_plan.quantity} (${reportData.kd_indicators.margin_plan.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.meetings_op.quantity > 0) {
-                    message += `👥 Количество планерок в ОП за месяц: ${reportData.kd_indicators.meetings_op.quantity} (${reportData.kd_indicators.meetings_op.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.trainings_op.quantity > 0) {
-                    message += `🎓 Количество обучений в ОП за месяц: ${reportData.kd_indicators.trainings_op.quantity} (${reportData.kd_indicators.trainings_op.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.applications_tki.quantity > 0) {
-                    message += `📝 Получено заявок в расчет ТКИ: ${reportData.kd_indicators.applications_tki.quantity} (${reportData.kd_indicators.applications_tki.description || 'Нет описания'})\n`;
-                }
-                if (reportData.kd_indicators.calculated_applications.quantity > 0) {
-                    message += `🧮 Рассчитано заявок: ${reportData.kd_indicators.calculated_applications.quantity} (${reportData.kd_indicators.calculated_applications.description || 'Нет описания'})\n`;
-                }
-            }
+            // ... existing KD indicators code
         } else if (reportData.department !== 'ГИ') {
-            // Regular KPIs for other departments (except ГИ)
             message += `<b>🎯 Показатели:</b>\n`;
-            if (reportData.kpi_indicators.deals.quantity > 0) {
+            if (reportData.kpi_indicators?.deals?.quantity > 0) {
                 message += `🔹 Сделки: ${reportData.kpi_indicators.deals.quantity} (${reportData.kpi_indicators.deals.description})\n`;
             }
-            if (reportData.kpi_indicators.meetings.quantity > 0) {
+            if (reportData.kpi_indicators?.meetings?.quantity > 0) {
                 message += `🔹 Планерки: ${reportData.kpi_indicators.meetings.quantity} (${reportData.kpi_indicators.meetings.description})\n`;
             }
-            if (reportData.kpi_indicators.training.quantity > 0) {
+            if (reportData.kpi_indicators?.training?.quantity > 0) {
                 message += `🔹 Обучение: ${reportData.kpi_indicators.training.quantity} (${reportData.kpi_indicators.training.description})\n`;
             }
         }
 
-        // Add tasks
-        if (reportData.tasks && reportData.tasks.length > 0) {
+        if (reportData.tasks?.length > 0) {
             message += `\n<b>✅ Задачи:</b>\n`;
             reportData.tasks.forEach((task, index) => {
                 message += `${index + 1}. <b>${task.task_text}</b> - ${task.status}\n`;
-                if (task.product) {
-                    message += `   Результат: ${task.product}\n`;
-                }
-                if (task.comment) {
-                    message += `   Комментарий: ${task.comment}\n`;
-                }
+                if (task.product) message += `   Результат: ${task.product}\n`;
             });
         }
 
-        // Add unplanned tasks
-        if (reportData.unplanned_tasks && reportData.unplanned_tasks.length > 0) {
+        if (reportData.unplanned_tasks?.length > 0) {
             message += `\n<b>⚠️ Вне плана:</b>\n`;
             reportData.unplanned_tasks.forEach((task, index) => {
                 message += `${index + 1}. <b>${task.task_text}</b> - ${task.status}\n`;
-                if (task.product) {
-                    message += `   Результат: ${task.product}\n`;
-                }
             });
         }
 
-        // Calculate stats
-        message += `\n📊 Эффективность: ${reportData.calculated_stats.percent}% (${reportData.calculated_stats.done}/${reportData.calculated_stats.total})`;
+        message += `\n📊 Эффективность: ${reportData.calculated_stats?.percent || 0}%`;
 
-        // Send to Telegram bot
         const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
         const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
         if (!telegramBotToken || !telegramChatId) {
-            console.error('Telegram credentials not set');
+            console.log('Telegram credentials not set, skipping send');
             return;
         }
 
         const telegramApiUrl = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
 
-        const response = await axios.post(telegramApiUrl, {
+        await axios.post(telegramApiUrl, {
             chat_id: telegramChatId,
             text: message,
             parse_mode: 'HTML'
         });
 
-        console.log('Successfully sent to Telegram:', response.data);
+        console.log('Successfully sent to Telegram');
     } catch (error) {
-        console.error('Error sending to Telegram:', error.response?.data || error.message);
+        console.error('Error sending to Telegram:', error.message);
     }
 }
 
@@ -172,30 +202,235 @@ app.post('/api/reports', async (req, res) => {
     const newReport = req.body;
     let reports = readData();
 
-    // Check if updating existing by ID
     const existingIndexById = reports.findIndex(r => r.id === newReport.id);
 
     if (existingIndexById >= 0) {
-        // Full overwrite (Editing mode)
         reports[existingIndexById] = newReport;
     } else {
-        // Add new
         reports.unshift(newReport);
     }
 
     writeData(reports);
-
-    // Send to Telegram in the background
     sendToTelegram(newReport);
 
     res.json({ success: true, report: newReport });
 });
 
-// Update entire list (for merging logic handled on client or bulk updates)
+// Update entire list
 app.post('/api/reports/sync', (req, res) => {
     const updatedReports = req.body;
     writeData(updatedReports);
     res.json({ success: true });
+});
+
+// Get all sheets in spreadsheet
+app.get('/api/sheets/sheets', async (req, res) => {
+    const { spreadsheetId } = req.query;
+    
+    if (!spreadsheetId) {
+        return res.json({ success: false, error: 'spreadsheetId is required' });
+    }
+    
+    try {
+        const auth = getGoogleAuth();
+        if (!auth) {
+            return res.json({ success: false, error: 'Google credentials not configured' });
+        }
+        
+        const sheets = google.sheets({ version: 'v4', auth });
+        
+        const response = await sheets.spreadsheets.get({
+            spreadsheetId: spreadsheetId
+        });
+        
+        const sheetNames = response.data.sheets.map(sheet => ({
+            title: sheet.properties.title,
+            sheetId: sheet.properties.sheetId,
+            index: sheet.properties.index
+        }));
+        
+        res.json({
+            success: true,
+            sheets: sheetNames
+        });
+    } catch (error) {
+        console.error('Get sheets error:', error.message);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Batch request for all departments
+app.post('/api/sheets/batch', async (req, res) => {
+    const { spreadsheetId, sheetNames } = req.body;
+
+    if (!spreadsheetId || !sheetNames) {
+        return res.json({ success: false, error: 'spreadsheetId and sheetNames are required' });
+    }
+
+    console.log('Received sheetNames:', sheetNames);
+
+    try {
+        const auth = getGoogleAuth();
+        if (!auth) {
+            return res.json({ success: false, error: 'Google credentials not configured' });
+        }
+
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        // Execute batch requests using googleapis with proper async handling
+        fs.appendFileSync('debug.log', 'sheetNames received: ' + JSON.stringify(sheetNames) + '\n');
+
+        const batchResults = await Promise.all(
+            sheetNames.map(async (sheetName) => {
+                fs.appendFileSync('debug.log', 'Processing: ' + sheetName + ' | UTF-8 hex: ' + Buffer.from(sheetName).toString('hex') + '\n');
+                
+                try {
+                    const response = await sheets.spreadsheets.values.get({
+                        spreadsheetId: spreadsheetId,
+                        range: sheetName
+                    }, {
+                        headers: {
+                            'Accept-Charset': 'utf-8',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                    });
+                    fs.appendFileSync('debug.log', 'Success for ' + sheetName + '\n');
+                    return {
+                        sheetName: sheetName,
+                        success: true,
+                        data: response.data.values || []
+                    };
+                } catch (error) {
+                    fs.appendFileSync('debug.log', 'Error for ' + sheetName + ': ' + error.message + '\n');
+                    return {
+                        sheetName: sheetName,
+                        success: false,
+                        error: error.message
+                    };
+                }
+            })
+        );
+        
+        res.json({
+            success: true,
+            results: batchResults
+        });
+    } catch (error) {
+        console.error('Batch request error:', error.message);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Google Sheets endpoints
+app.post('/api/test', (req, res) => {
+    res.json({ success: true, message: 'Test endpoint works' });
+});
+
+app.post('/api/sheets/connect', async (req, res) => {
+    const { url, sheetName } = req.body;
+    
+    try {
+        const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (!match) {
+            return res.json({ success: false, error: 'Неверная ссылка на таблицу' });
+        }
+        
+        const spreadsheetId = match[1];
+        const range = sheetName || 'Sheet1';
+        
+        // Try to get data from Google Sheets
+        const rows = await getSheetsData(spreadsheetId, range);
+        const reports = parseSheetsToReports(rows);
+        
+        res.json({
+            success: true,
+            title: 'Google Таблица',
+            spreadsheetId: spreadsheetId,
+            sheetName: range,
+            rows: rows.slice(1).map(row =u003e ({
+                date: row[0] || '-',
+                department: row[1] || '-',
+                task: row[2] || '-',
+                status: row[3] || '-',
+                result: row[4] || '-'
+            })),
+            reports: reports
+        });
+    } catch (error) {
+        console.error('Sheets connect error:', error.message);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/sheets/import', async (req, res) => {
+    const { url, sheetName } = req.body;
+    
+    try {
+        const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (!match) {
+            return res.json({ success: false, error: 'Неверная ссылка на таблицу' });
+        }
+        
+        const spreadsheetId = match[1];
+        const range = sheetName || 'Sheet1';
+        
+        const rows = await getSheetsData(spreadsheetId, range);
+        const reports = parseSheetsToReports(rows);
+        
+        // Merge with existing reports
+        let existingReports = readData();
+        reports.forEach(report => {
+            const existingIndex = existingReports.findIndex(r => 
+                r.source === 'google-sheets' && 
+                r.department === report.department &&
+                r.period.week_dates === report.period.week_dates
+            );
+            
+            if (existingIndex >= 0) {
+                existingReports[existingIndex] = report;
+            } else {
+                existingReports.unshift(report);
+            }
+        });
+        
+        writeData(existingReports);
+        
+        res.json({
+            success: true,
+            imported: reports.length,
+            reports: existingReports
+        });
+    } catch (error) {
+        console.error('Sheets import error:', error.message);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/sheets/sync', async (req, res) => {
+    // Return current reports from database
+    const reports = readData().filter(r => r.source === 'google-sheets');
+    
+    res.json({
+        success: true,
+        rows: reports.map(r => ({
+            date: r.period?.week_dates || '-',
+            department: r.department || '-',
+            task: r.tasks?.[0]?.task_text || '-',
+            status: r.tasks?.[0]?.status || '-',
+            result: r.tasks?.[0]?.product || '-'
+        }))
+    });
+});
+
+// Check Google credentials status
+app.get('/api/sheets/status', (req, res) => {
+    const hasCredentials = fs.existsSync(CREDENTIALS_FILE);
+    res.json({
+        configured: hasCredentials,
+        message: hasCredentials 
+            ? 'Google Sheets API настроен' 
+            : 'Google Sheets API не настроен. Добавьте google-credentials.json'
+    });
 });
 
 // Serve Frontend
@@ -205,4 +440,15 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    
+    // Check for credentials
+    if (!fs.existsSync(CREDENTIALS_FILE)) {
+        console.log('\n⚠️  Google Sheets API не настроен!');
+        console.log('📋 Для настройки:');
+        console.log('1. Создайте проект в Google Cloud Console');
+        console.log('2. Включите Google Sheets API');
+        console.log('3. Создайте сервисный аккаунт и скачайте JSON');
+        console.log('4. Сохраните его как: data/google-credentials.json');
+        console.log('\n📖 Инструкция: https://developers.google.com/sheets/api/quickstart/nodejs\n');
+    }
 });

@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Weekly Report Generator (Express)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="lucide.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -42,9 +44,34 @@
         .animate-fade-in { animation: fadeIn 0.5s ease-out; }
         .spinner { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .safe-area-pb {
+                padding-bottom: env(safe-area-inset-bottom, 20px);
+            }
+            input[type="number"], input[type="text"], textarea, select {
+                font-size: 16px !important;
+                -webkit-appearance: none;
+                border-radius: 0;
+            }
+            button {
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
+            }
+            textarea {
+                min-height: 40px !important;
+            }
+            .touch-manipulation {
+                touch-action: manipulation;
+            }
+            .min-h-screen {
+                min-height: 100dvh;
+            }
+        }
     </style>
 </head>
-<body class="bg-white font-sans text-slate-900 pb-20">
+<body class="bg-white font-sans text-slate-900 pb-20 md:pb-8 antialiased">
     <div id="app"></div>
     <script src="script.js"></script>
 </body>
