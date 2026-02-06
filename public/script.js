@@ -237,15 +237,15 @@ const renderDepartmentTasks = (department) => {
         return `
             <div class="border-b border-slate-200 last:border-0">
                 <div class="bg-slate-100 px-4 py-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold text-slate-800">${week.name}</span>
-                    </div>
+                    <span class="font-bold text-slate-800">${week.name}</span>
                     <div class="flex items-center gap-2 text-xs">
                         <span class="text-slate-500">${weekCompleted}/${weekTotal} задач</span>
                         <span class="px-2 py-0.5 rounded font-bold ${weekPercent >= 70 ? 'bg-green-100 text-green-700' : weekPercent >= 40 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}">${weekPercent}%</span>
                     </div>
                 </div>
-                <table class="w-full text-sm">
+                
+                <!-- Desktop Table -->
+                <table class="hidden sm:table w-full text-sm">
                     <thead class="bg-slate-100 border-b-2 border-slate-200">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-10">№</th>
@@ -256,19 +256,46 @@ const renderDepartmentTasks = (department) => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                            ${week.tasks.map((task, taskIndex) => `
-                                <tr class="${taskIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-slate-100 border-b border-slate-100">
-                                    <td class="px-3 py-1.5 text-slate-700 font-medium w-10">${task.id}</td>
-                                    <td class="px-3 py-1.5 text-slate-900 font-medium break-words flex-1">${task.task}</td>
-                                    <td class="px-3 py-1.5 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
-                                    <td class="px-3 py-1.5 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
-                                    <td class="px-3 py-1.5 w-20">
-                                        <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
-                                    </td>
-                                </tr>
-                            `).join('')}
+                        ${week.tasks.map(task => `
+                            <tr class="hover:bg-slate-100 border-b border-slate-100">
+                                <td class="px-3 py-2 text-slate-700 font-medium w-10">${task.id}</td>
+                                <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
+                                <td class="px-3 py-2 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
+                                <td class="px-3 py-2 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
+                                <td class="px-3 py-2 w-20">
+                                    <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                                </td>
+                            </tr>
+                        `).join('')}
                     </tbody>
                 </table>
+                
+                <!-- Mobile Cards -->
+                <div class="sm:hidden space-y-3 p-3">
+                    ${week.tasks.map(task => `
+                        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                            <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
+                                <span class="font-bold text-slate-700">#${task.id}</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                            </div>
+                            <div class="p-3 space-y-2">
+                                <div class="text-slate-900 font-medium">${task.task}</div>
+                                ${task.product ? `
+                                    <div class="text-sm">
+                                        <span class="text-slate-500 font-medium">📦 Продукт:</span>
+                                        <span class="text-slate-700 ml-1">${task.product}</span>
+                                    </div>
+                                ` : ''}
+                                ${task.comment ? `
+                                    <div class="text-sm">
+                                        <span class="text-slate-500 font-medium">💬 Комментарий:</span>
+                                        <span class="text-slate-700 ml-1">${task.comment}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
         `;
     }).join('');
