@@ -1301,11 +1301,16 @@ const parseDepartmentData = (rows, sheetName) => {
     });
 
     // Sort weeks by date (newest first)
-    weeks.sort((a, b) => {
-        const dateA = a.name.replace(/\./g, '-');
-        const dateB = b.name.replace(/\./g, '-');
-        return dateB.localeCompare(dateA);
-    });
+    const parseWeekDate = (dateStr) => {
+        const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2})/);
+        if (parts) {
+            const [, d1, m1, d2, m2, y] = parts;
+            return new Date('20' + y, parseInt(m2) - 1, parseInt(d2));
+        }
+        return new Date(0);
+    };
+
+    weeks.sort((a, b) => parseWeekDate(b.name) - parseWeekDate(a.name));
 
     return { weeks, stats };
 };
