@@ -161,7 +161,7 @@ const renderGoogleSheetsDashboard = () => {
                     <i data-lucide="table" class="w-7 h-7 text-green-600"></i>
                     Отчеты по отделам
                 </h1>
-                <p class="text-xs text-slate-500 mt-0.5">Google Sheets - ${new Date().toLocaleDateString('ru-RU')}</p>
+                <p class="text-xs text-slate-500 mt-0.5">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="loadAllDepartments()" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-1">
@@ -980,7 +980,7 @@ const renderGoogleSheetsView = () => {
                     <i data-lucide="table" class="w-6 h-6 text-green-600"></i>
                     Отчеты по отделам
                 </h1>
-                <p class="text-xs text-slate-500 mt-0.5">Google Sheets</p>
+                <p class="text-xs text-slate-500 mt-0.5">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="refreshAllDepartments()" class="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-1">
