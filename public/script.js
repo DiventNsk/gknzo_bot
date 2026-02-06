@@ -48,6 +48,7 @@ const state = {
     department: null,
     reportType: 'weekly',
     korsovetMode: 'korsovet',
+    statusFilter: 'all',
     period: { week_dates: getWeekRange(), is_manual: false },
     kpis: {
         deals: { quantity: 0, description: '' },
@@ -208,12 +209,6 @@ const renderGoogleSheetsDashboard = () => {
                 </div>
             </div>
         </div>
-                    <button onclick="importDepartment()" class="hidden px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded flex items-center gap-1">
-                        <i data-lucide="download" class="w-3 h-3"></i>
-                        Импорт
-                    </button>
-                </div>
-            </div>
             <div class="overflow-x-auto custom-scrollbar">
                 ${renderDepartmentTasks(currentDepartment)}
             </div>
@@ -222,25 +217,62 @@ const renderGoogleSheetsDashboard = () => {
 `;
 };
 
+const filterTasksByStatus = (tasks, filter) => {
+    if (filter === 'all') return tasks;
+    return tasks.filter(task => {
+        const status = (task.status || '').toLowerCase();
+        switch (filter) {
+            case 'done': return status.includes('выполн');
+            case 'in_progress': return status.includes('работе') || status.includes('progress');
+            case 'not_done': return status.includes('не выполн');
+            default: return true;
+        }
+    });
+};
+
+const getStatusFilterLabel = (filter) => {
+    switch (filter) {
+        case 'all': return 'Все';
+        case 'done': return '✓ Выполнено';
+        case 'in_progress': return '⟳ В работе';
+        case 'not_done': return '✕ Не выполнено';
+        default: return 'Фильтр';
+    }
+};
+
 const renderDepartmentTasks = (department) => {
     const data = departmentsData[department];
     
     if (!data || !data.weeks || data.weeks.length === 0) {
         return '<div class="p-8 text-center text-slate-400">Нет данных. Нажмите "Обновить" для загрузки.</div>';
     }
+
+    const filterLabel = getStatusFilterLabel(state.statusFilter);
     
-    return data.weeks.map((week, weekIndex) => {
-        const weekCompleted = week.tasks.filter(t => (t.status || '').toLowerCase().includes('выполн')).length;
-        const weekTotal = week.tasks.length;
-        const weekPercent = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
+    return `
+        <div class="mb-4">
+            <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg text-sm font-bold bg-white focus:outline-none focus:border-green-500 cursor-pointer">
+                <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
+                <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
+                <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
+                <option value="not_done" ${state.statusFilter === 'not_done' ? 'selected' : ''}>✕ Не выполнено</option>
+            </select>
+        </div>
+        ${data.weeks.map((week, weekIndex) => {
+            const filteredTasks = filterTasksByStatus(week.tasks, state.statusFilter);
+            if (filteredTasks.length === 0) return '';
+            
+            const weekCompleted = week.tasks.filter(t => (t.status || '').toLowerCase().includes('выполн')).length;
+            const weekTotal = week.tasks.length;
+            const weekPercent = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
         
         return `
             <div class="border-b border-slate-200 last:border-0">
-                <div class="bg-slate-100 px-4 py-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                    <span class="font-bold text-slate-800">${week.name}</span>
-                    <div class="flex items-center gap-2 text-xs">
-                        <span class="text-slate-500">${weekCompleted}/${weekTotal} задач</span>
-                        <span class="px-2 py-0.5 rounded font-bold ${weekPercent >= 70 ? 'bg-green-100 text-green-700' : weekPercent >= 40 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}">${weekPercent}%</span>
+                <div class="bg-green-50 px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-600 shadow-sm">
+                    <span class="font-bold text-green-900 text-base">${week.name}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-green-700">${weekCompleted}/${weekTotal}</span>
+                        <span class="px-3 py-1 font-bold text-white ${weekPercent >= 70 ? 'bg-green-600' : weekPercent >= 40 ? 'bg-orange-500' : 'bg-red-500'}">${weekPercent}%</span>
                     </div>
                 </div>
                 
@@ -256,7 +288,7 @@ const renderDepartmentTasks = (department) => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        ${week.tasks.map(task => `
+                        ${filteredTasks.map(task => `
                             <tr class="hover:bg-slate-100 border-b border-slate-100">
                                 <td class="px-3 py-2 text-slate-700 font-medium w-10">${task.id}</td>
                                 <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
@@ -272,7 +304,7 @@ const renderDepartmentTasks = (department) => {
                 
                 <!-- Mobile Cards -->
                 <div class="sm:hidden space-y-3 p-3">
-                    ${week.tasks.map(task => `
+                    ${filteredTasks.map(task => `
                         <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                             <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
                                 <span class="font-bold text-slate-700">#${task.id}</span>
@@ -298,11 +330,17 @@ const renderDepartmentTasks = (department) => {
                 </div>
             </div>
         `;
-    }).join('');
-};
+    }).join('')}
+    ${data.weeks.every(week => filterTasksByStatus(week.tasks, state.statusFilter).length === 0) ? '<div class="p-8 text-center text-slate-400">Нет задач с выбранным статусом</div>' : ''}
+    </div>
+    `;
+}
+
+
 
 window.switchDepartment = (dept) => {
     currentDepartment = dept;
+    state.statusFilter = 'all';
 
     document.querySelectorAll('.department-btn').forEach(btn => {
         if (btn.dataset.dept === dept) {
@@ -322,7 +360,20 @@ window.switchDepartment = (dept) => {
         container.innerHTML = renderDepartmentTasks(dept);
     }
 
+    const filterSelect = document.getElementById('statusFilterSelect');
+    if (filterSelect) filterSelect.value = 'all';
+
     if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.setStatusFilter = (filter) => {
+    state.statusFilter = filter;
+    const container = document.querySelector('.overflow-x-auto.custom-scrollbar');
+    if (container) {
+        container.innerHTML = renderDepartmentTasks(currentDepartment);
+    }
+    const filterSelect = document.getElementById('statusFilterSelect');
+    if (filterSelect) filterSelect.value = filter;
 };
 window.setDirectorFilter = (type) => {
     state.reportType = type;
@@ -1482,9 +1533,10 @@ const renderSheetsTable = (rows) => {
 };
 
 const getStatusClass = (status) => {
+    if (status?.toLowerCase().includes('не выполн')) return 'bg-red-100 text-red-700 border-red-200';
     if (status?.toLowerCase().includes('выполн')) return 'bg-green-100 text-green-700 border-green-200';
     if (status?.toLowerCase().includes('работе')) return 'bg-orange-100 text-orange-700 border-orange-200';
-    if (status?.toLowerCase().includes('не выполн')) return 'bg-red-100 text-red-700 border-red-200';
+    if (status?.toLowerCase().includes('без статуса')) return 'bg-slate-100 text-slate-700 border-slate-200';
     return 'bg-gray-100 text-gray-600 border-gray-200';
 };
 
