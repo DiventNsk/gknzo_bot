@@ -47,20 +47,35 @@ const writeData = (data) => {
 
 // Google Sheets Helper
 const getGoogleAuth = () => {
-    // Check for service account credentials
-    if (fs.existsSync(CREDENTIALS_FILE)) {
-        const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
-        
-        // Use service account
-        const auth = new google.auth.GoogleAuth({
-            credentials: credentials,
-            scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
-        return auth;
+    let credentials = null;
+
+    // Check for GOOGLE_CREDENTIALS environment variable (Railway)
+    if (process.env.GOOGLE_CREDENTIALS) {
+        try {
+            credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+        } catch (e) {
+            console.error('Failed to parse GOOGLE_CREDENTIALS:', e.message);
+        }
     }
-    
-    // Fallback to OAuth2 with API key
-    return null;
+    // Fallback to file
+    else if (fs.existsSync(CREDENTIALS_FILE)) {
+        try {
+            credentials = JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+        } catch (e) {
+            console.error('Failed to parse credentials file:', e.message);
+        }
+    }
+
+    if (!credentials) {
+        return null;
+    }
+
+    // Use service account
+    const auth = new google.auth.GoogleAuth({
+        credentials: credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+    return auth;
 };
 
 const getSheetsData = async (spreadsheetId, range) => {
