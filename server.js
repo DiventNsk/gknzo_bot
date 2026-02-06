@@ -409,7 +409,7 @@ app.post('/api/sheets/import', async (req, res) => {
 app.get('/api/sheets/sync', async (req, res) => {
     // Return current reports from database
     const reports = readData().filter(r => r.source === 'google-sheets');
-    
+
     res.json({
         success: true,
         rows: reports.map(r => ({
@@ -420,6 +420,68 @@ app.get('/api/sheets/sync', async (req, res) => {
             result: r.tasks?.[0]?.product || '-'
         }))
     });
+});
+
+// Remote sync trigger (use token in query string)
+// Example: GET /api/sheets/remote-sync?token=YOUR_TOKEN&spreadsheetId=XXX
+app.get('/api/sheets/remote-sync', async (req, res) => {
+    const SYNC_TOKEN = process.env.SYNC_TOKEN || 'gknzo-sync-2026';
+    const { token, spreadsheetId } = req.query;
+
+    if (token !== SYNC_TOKEN) {
+        return res.status(401).json({ success: false, error: 'Invalid token' });
+    }
+
+    if (!spreadsheetId) {
+        return res.status(400).json({ success: false, error: 'spreadsheetId required' });
+    }
+
+    console.log('Remote sync triggered for:', spreadsheetId);
+
+    try {
+        const auth = getGoogleAuth();
+        if (!auth) {
+            return res.status(500).json({ success: false, error: 'Google credentials not configured' });
+        }
+
+        const sheets = google.sheets({ version: 'v4', auth });
+        const sheetNames = ['НП', 'ГИ', 'КД', 'РОП', 'РОМ', 'РОПР', 'РСО'];
+
+        const batchResults = await Promise.all(
+            sheetNames.map(async (sheetName) => {
+                try {
+                    const response = await sheets.spreadsheets.values.get({
+                        spreadsheetId: spreadsheetId,
+                        range: sheetName
+                    });
+                    return { sheetName, success: true, data: response.data.values || [] };
+                } catch (error) {
+                    return { sheetName, success: false, error: error.message };
+                }
+            })
+        );
+
+        const summary = {
+            total: batchResults.length,
+            success: batchResults.filter(r => r.success).length,
+            failed: batchResults.filter(r => !r.success).length
+        };
+
+        res.json({
+            success: true,
+            spreadsheetId,
+            summary,
+            results: batchResults.map(r => ({
+                sheetName: r.sheetName,
+                success: r.success,
+                rowsCount: r.data?.length || 0,
+                error: r.error || null
+            }))
+        });
+    } catch (error) {
+        console.error('Remote sync error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 // Check Google credentials status
