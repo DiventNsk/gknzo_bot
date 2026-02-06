@@ -1388,14 +1388,13 @@ const renderDepartmentData = (department) => {
     const html = data.weeks.map((week, weekIndex) => {
         const weekCompleted = week.tasks.filter(t => (t.status || '').toLowerCase().includes('выполн')).length;
         const weekTotal = week.tasks.length;
-        const weekPercent = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
 
         return `
             <tr class="bg-slate-100">
                 <td colspan="5" class="px-3 py-2">
                     <div class="flex justify-between items-center">
                         <span class="font-bold text-slate-800">${week.name}</span>
-                        <span class="text-xs text-slate-500">${weekCompleted}/${weekTotal} (${weekPercent}%)</span>
+                        <span class="text-xs text-slate-500">${weekCompleted}/${weekTotal}</span>
                     </div>
                 </td>
             </tr>
