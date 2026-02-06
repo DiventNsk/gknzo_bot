@@ -1299,7 +1299,14 @@ const parseDepartmentData = (rows, sheetName) => {
             }
         }
     });
-    
+
+    // Sort weeks by date (newest first)
+    weeks.sort((a, b) => {
+        const dateA = a.name.replace(/\./g, '-');
+        const dateB = b.name.replace(/\./g, '-');
+        return dateB.localeCompare(dateA);
+    });
+
     return { weeks, stats };
 };
 
