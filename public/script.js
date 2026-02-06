@@ -295,7 +295,7 @@ const renderDepartmentTasks = (department) => {
 
 window.switchDepartment = (dept) => {
     currentDepartment = dept;
-    
+
     document.querySelectorAll('.department-btn').forEach(btn => {
         if (btn.dataset.dept === dept) {
             btn.classList.add('border-green-600', 'bg-green-50');
@@ -305,8 +305,10 @@ window.switchDepartment = (dept) => {
             btn.classList.add('border-slate-200');
         }
     });
-    
-    document.getElementById('currentDepartmentTitle').textContent = dept;
+
+    const titleEl = document.getElementById('currentDepartmentTitle');
+    if (titleEl) titleEl.textContent = dept;
+
     renderDepartmentData(dept);
     if (typeof lucide !== 'undefined') lucide.createIcons();
 };
