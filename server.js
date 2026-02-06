@@ -515,6 +515,19 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Login endpoint
+app.post('/api/login', (req, res) => {
+    const { login, password } = req.body;
+    const ADMIN_LOGIN = process.env.ADMIN_LOGIN || 'admin';
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'gknzo123';
+
+    if (login === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+        res.json({ success: true, token: 'authenticated' });
+    } else {
+        res.status(401).json({ success: false, error: 'Неверный логин или пароль' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     

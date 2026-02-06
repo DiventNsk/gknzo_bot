@@ -1,3 +1,19 @@
+// --- AUTH CHECK ---
+const checkAuth = () => {
+    const token = localStorage.getItem('authToken');
+    if (!token || token !== 'authenticated') {
+        window.location.href = '/login.html';
+        return false;
+    }
+    return true;
+};
+
+// Logout function
+window.logout = () => {
+    localStorage.removeItem('authToken');
+    window.location.href = '/login.html';
+};
+
 // --- UTILS ---
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -136,22 +152,7 @@ const renderMainDashboard = () => {
 };
 
 const renderGoogleSheetsDashboard = () => {
-    const defaultSheetNames = ['НП', 'ГИ', 'КД', 'РОП', 'РОМ', 'РОПР', 'РСО'];
-    
-    // Calculate overall statistics
-    let totalTasks = 0;
-    let completedTasks = 0;
-    let inProgressTasks = 0;
-    let notCompletedTasks = 0;
-    
-    Object.values(departmentsData).forEach(deptData => {
-        totalTasks += deptData.stats?.total || 0;
-        completedTasks += deptData.stats?.completed || 0;
-        inProgressTasks += deptData.stats?.inProgress || 0;
-        notCompletedTasks += deptData.stats?.notCompleted || 0;
-    });
-    
-    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const defaultSheetNames = ['НП', 'ГИ', 'КД', 'РОМ', 'РОПР', 'РСО'];
     
     return `
     <div class="animate-fade-in">
@@ -171,29 +172,6 @@ const renderGoogleSheetsDashboard = () => {
             </div>
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-            <div class="bg-white border-2 border-slate-200 rounded-lg p-3 text-center">
-                <div class="text-2xl sm:text-3xl font-black text-slate-900">${totalTasks}</div>
-                <div class="text-xs text-slate-500 font-bold uppercase">Всего</div>
-            </div>
-            <div class="bg-white border-2 border-green-200 rounded-lg p-3 text-center">
-                <div class="text-2xl sm:text-3xl font-black text-green-600">${completedTasks}</div>
-                <div class="text-xs text-green-600 font-bold uppercase">Выполнено</div>
-            </div>
-            <div class="bg-white border-2 border-blue-200 rounded-lg p-3 text-center">
-                <div class="text-2xl sm:text-3xl font-black text-blue-600">${inProgressTasks}</div>
-                <div class="text-xs text-blue-600 font-bold uppercase">В работе</div>
-            </div>
-            <div class="bg-white border-2 border-red-200 rounded-lg p-3 text-center">
-                <div class="text-2xl sm:text-3xl font-black text-red-600">${notCompletedTasks}</div>
-                <div class="text-xs text-red-600 font-bold uppercase">Не выполнено</div>
-            </div>
-            <div class="bg-slate-900 rounded-lg p-3 text-center">
-                <div class="text-2xl sm:text-3xl font-black text-white">${completionRate}%</div>
-                <div class="text-xs text-slate-400 font-bold uppercase">Выполняемость</div>
-            </div>
-        </div>
-
         <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden mb-4">
             <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2">
                 <h2 class="font-bold text-slate-800 flex items-center gap-2">
@@ -205,13 +183,11 @@ const renderGoogleSheetsDashboard = () => {
             <div class="p-2 overflow-x-auto">
                 <div class="flex gap-1" id="departmentGrid">
                     ${defaultSheetNames.map(sheet => {
-                        const deptData = departmentsData[sheet] || { stats: { total: 0, completed: 0 } };
-                        const deptCompletion = deptData.stats?.total > 0 ? Math.round((deptData.stats.completed / deptData.stats.total) * 100) : 0;
+                        const deptData = departmentsData[sheet] || { stats: { total: 0 } };
                         return `
                             <button onclick="switchDepartment('${sheet}')" class="department-btn flex-1 min-w-[80px] p-2 rounded-lg border-2 border-slate-200 hover:border-green-500 hover:bg-green-50 transition-all text-center ${currentDepartment === sheet ? 'border-green-600 bg-green-50' : ''}" data-dept="${sheet}">
                                 <div class="font-bold text-sm text-slate-900">${sheet}</div>
                                 <div class="text-xs text-slate-500">${deptData.stats?.total || 0} задач</div>
-                                <div class="text-xs font-bold ${deptCompletion >= 70 ? 'text-green-600' : deptCompletion >= 40 ? 'text-yellow-600' : 'text-red-600'}">${deptCompletion}%</div>
                             </button>
                         `;
                     }).join('')}
@@ -267,21 +243,21 @@ const renderDepartmentTasks = (department) => {
                 <table class="w-full text-sm">
                     <thead class="bg-white border-b border-slate-100">
                         <tr>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-10">№</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase">Задача</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-32">Продукт</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-40 hidden md:table-cell">Результат</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-24">Статус</th>
+                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-12">№</th>
+                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase flex-1">Задача</th>
+                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-1/4">Продукт</th>
+                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-1/5">Результат</th>
+                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-20">Статус</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
                         ${week.tasks.map(task => `
                             <tr class="hover:bg-slate-50">
-                                <td class="px-3 py-2 text-slate-700 font-medium">${task.id}</td>
-                                <td class="px-3 py-2 text-slate-900 font-medium">${task.task}</td>
-                                <td class="px-3 py-2 text-slate-600 text-xs">${task.product || '-'}</td>
-                                <td class="px-3 py-2 text-slate-500 text-xs hidden md:table-cell">${task.comment || '-'}</td>
-                                <td class="px-3 py-2">
+                                <td class="px-3 py-2 text-slate-700 font-medium w-12">${task.id}</td>
+                                <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
+                                <td class="px-3 py-2 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
+                                <td class="px-3 py-2 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
+                                <td class="px-3 py-2 w-20">
                                     <span class="px-2 py-0.5 rounded text-xs font-bold ${getStatusClass(task.status)}">${task.status}</span>
                                 </td>
                             </tr>
@@ -306,10 +282,14 @@ window.switchDepartment = (dept) => {
         }
     });
 
-    const titleEl = document.getElementById('currentDepartmentTitle');
+    const titleEl = document.getElementById('deptTitle');
     if (titleEl) titleEl.textContent = dept;
 
-    renderDepartmentData(dept);
+    const container = document.querySelector('.overflow-x-auto.custom-scrollbar');
+    if (container) {
+        container.innerHTML = renderDepartmentTasks(dept);
+    }
+
     if (typeof lucide !== 'undefined') lucide.createIcons();
 };
 window.setDirectorFilter = (type) => {
@@ -972,7 +952,7 @@ const renderDashboard = () => {
 
 const renderGoogleSheetsView = () => {
     const defaultSpreadsheetId = '1r5ketMWQAkiXGQMEq9jR_qf0CQLZhFaZDfGrUTAtyvU';
-    const defaultSheetNames = ['НП', 'ГИ', 'КД', 'РОП', 'РОМ', 'РОПР', 'РСО'];
+    const defaultSheetNames = ['НП', 'ГИ', 'КД', 'РОМ', 'РОПР', 'РСО'];
     
     return `
     <div class="animate-fade-in pb-24">
@@ -1064,9 +1044,6 @@ const renderGoogleSheetsView = () => {
                     </div>
                 </div>
                 <div class="p-4">
-                    <div id="departmentStats" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                        <!-- Статистика будет добавлена динамически -->
-                    </div>
                     <div class="overflow-x-auto custom-scrollbar">
                         <table class="w-full text-sm">
                             <thead class="bg-slate-50 border-b border-slate-200">
@@ -1334,8 +1311,8 @@ const parseTaskRow = (row, format) => {
             // ["№", "Задача", "", "РЕЗУЛЬТАТ", "КОММЕНТАРИЙ", "ИТОГ (статус)"]
             return { task: row[1] || '', product: row[2] || '', comment: row[3] || '', status: row[4] || 'Без статуса' };
         case 'kd':
-            // ["1", "", "Задача", "продукт", "результат", "комментарий"]
-            return { task: row[2] || '', product: row[3] || '', comment: row[4] || '', status: row[5] || 'Без статуса' };
+            // ["№","ЗАДАЧИ","ПРОДУКТ","РЕЗУЛЬТАТ","КОММЕНТАРИЙ"]
+            return { task: row[1] || '', product: row[2] || '', comment: row[4] || '', status: row[3] || 'Без статуса' };
         case 'rop':
             // ["1", "Задача", "", "", "", "", "продукт", "", "", "статус"]
             return { task: row[1] || '', product: row[6] || '', comment: row[7] || '', status: row[9] || 'Без статуса' };
@@ -1356,28 +1333,6 @@ const parseTaskRow = (row, format) => {
 const renderDepartmentData = (department) => {
     const data = departmentsData[department] || { weeks: [], stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
     
-    // Render stats
-    const statsHtml = `
-        <div class="text-center">
-            <div class="text-2xl font-bold text-slate-900">${data.stats.total}</div>
-            <div class="text-xs text-slate-500">Всего</div>
-        </div>
-        <div class="text-center">
-            <div class="text-2xl font-bold text-green-600">${data.stats.completed}</div>
-            <div class="text-xs text-slate-500">Выполнено</div>
-        </div>
-        <div class="text-center">
-            <div class="text-2xl font-bold text-blue-600">${data.stats.inProgress}</div>
-            <div class="text-xs text-slate-500">В работе</div>
-        </div>
-        <div class="text-center">
-            <div class="text-2xl font-bold text-red-600">${data.stats.notCompleted}</div>
-            <div class="text-xs text-slate-500">Не выполнено</div>
-        </div>
-    `;
-    
-    document.getElementById('departmentStats').innerHTML = statsHtml;
-    
     // Render table with weeks
     const container = document.getElementById('departmentTableBody');
     if (!data.weeks || data.weeks.length === 0) {
@@ -1388,24 +1343,23 @@ const renderDepartmentData = (department) => {
     const html = data.weeks.map((week, weekIndex) => {
         const weekCompleted = week.tasks.filter(t => (t.status || '').toLowerCase().includes('выполн')).length;
         const weekTotal = week.tasks.length;
-        const weekPercent = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
 
         return `
             <tr class="bg-slate-100">
                 <td colspan="5" class="px-3 py-2">
                     <div class="flex justify-between items-center">
                         <span class="font-bold text-slate-800">${week.name}</span>
-                        <span class="text-xs text-slate-500">${weekCompleted}/${weekTotal} (${weekPercent}%)</span>
+                        <span class="text-xs text-slate-500">${weekCompleted}/${weekTotal}</span>
                     </div>
                 </td>
             </tr>
             ${week.tasks.map(task => `
                 <tr class="hover:bg-slate-50 border-b border-slate-100">
-                    <td class="px-3 py-2 text-slate-700 font-medium">${task.id}</td>
-                    <td class="px-3 py-2 text-slate-900 font-medium">${task.task}</td>
-                    <td class="px-3 py-2 text-slate-600 text-xs">${task.product || '-'}</td>
-                    <td class="px-3 py-2 text-slate-500 text-xs">${task.comment || '-'}</td>
-                    <td class="px-3 py-2">
+                    <td class="px-3 py-2 text-slate-700 font-medium w-12">${task.id}</td>
+                    <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
+                    <td class="px-3 py-2 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
+                    <td class="px-3 py-2 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
+                    <td class="px-3 py-2 w-20">
                         <span class="px-2 py-0.5 rounded text-xs font-bold ${getStatusClass(task.status)}">${task.status}</span>
                     </td>
                 </tr>
@@ -1489,6 +1443,8 @@ const getStatusClass = (status) => {
 
 // --- INIT ---
 const init = async () => {
+    if (!checkAuth()) return;
+
     state.view = 'sheets';
     setInterval(checkDeadline, 60000);
     checkDeadline();
