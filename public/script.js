@@ -14,6 +14,12 @@ window.logout = () => {
     window.location.href = '/login.html';
 };
 
+// Switch Korsovet/Plan Dnya mode
+window.switchKorsovetMode = (mode) => {
+    state.korsovetMode = mode;
+    render();
+};
+
 // --- UTILS ---
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -41,6 +47,7 @@ const checkDeadline = () => {
 const state = {
     department: null,
     reportType: 'weekly',
+    korsovetMode: 'korsovet',
     period: { week_dates: getWeekRange(), is_manual: false },
     kpis: {
         deals: { quantity: 0, description: '' },
@@ -156,29 +163,36 @@ const renderGoogleSheetsDashboard = () => {
     
     return `
     <div class="animate-fade-in">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 pb-3 border-b-2 border-slate-900">
-            <div>
-                <h1 class="text-xl md:text-3xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
-                    <i data-lucide="table" class="w-7 h-7 text-green-600"></i>
-                    Отчеты по отделам
-                </h1>
-                <p class="text-xs text-slate-500 mt-0.5">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="loadAllDepartments()" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase rounded flex items-center gap-1">
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i>
-                    Обновить
-                </button>
-            </div>
+        <div class="flex flex-col items-center mb-4 pb-3 border-b-2 border-slate-900">
+            <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                <i data-lucide="table" class="w-7 h-7 text-green-600"></i>
+                Отчеты
+            </h1>
+            <p class="text-xs text-slate-500 mt-2">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <button onclick="loadAllDepartments()" class="mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold uppercase rounded flex items-center gap-2 shadow-md transition-all hover:shadow-lg">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                Обновить
+            </button>
         </div>
 
         <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden mb-4">
-            <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2">
-                <h2 class="font-bold text-slate-800 flex items-center gap-2">
+            <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-center">
+                <div class="flex gap-1">
+                    <button onclick="switchKorsovetMode('korsovet')" class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all ${state.korsovetMode === 'korsovet' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}">
+                        Корсовет
+                    </button>
+                    <button onclick="switchKorsovetMode('plan_dnya')" class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all ${state.korsovetMode === 'plan_dnya' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}">
+                        План дня руководителя
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 px-4 py-2 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2">
+                <h2 class="hidden font-bold text-slate-800 flex items-center gap-2">
                     <i data-lucide="users" class="w-4 h-4 text-green-600"></i>
                     Отделы
                 </h2>
-                <span class="text-xs text-slate-500">${Object.keys(departmentsData).length} из ${defaultSheetNames.length} загружено</span>
+                <span class="hidden text-xs text-slate-500">${Object.keys(departmentsData).length} из ${defaultSheetNames.length} загружено</span>
             </div>
             <div class="p-2 overflow-x-auto">
                 <div class="flex gap-1" id="departmentGrid">
@@ -194,15 +208,7 @@ const renderGoogleSheetsDashboard = () => {
                 </div>
             </div>
         </div>
-
-        <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden">
-            <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-                <h2 class="font-bold text-slate-800 flex items-center gap-2">
-                    <i data-lucide="list" class="w-4 h-4 text-green-600"></i>
-                    <span id="deptTitle">${currentDepartment}</span>
-                </h2>
-                <div class="flex gap-1">
-                    <button onclick="importDepartment()" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded flex items-center gap-1">
+                    <button onclick="importDepartment()" class="hidden px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded flex items-center gap-1">
                         <i data-lucide="download" class="w-3 h-3"></i>
                         Импорт
                     </button>
@@ -232,36 +238,35 @@ const renderDepartmentTasks = (department) => {
             <div class="border-b border-slate-200 last:border-0">
                 <div class="bg-slate-100 px-4 py-2 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                     <div class="flex items-center gap-2">
-                        <i data-lucide="calendar" class="w-4 h-4 text-slate-600"></i>
                         <span class="font-bold text-slate-800">${week.name}</span>
                     </div>
                     <div class="flex items-center gap-2 text-xs">
                         <span class="text-slate-500">${weekCompleted}/${weekTotal} задач</span>
-                        <span class="px-2 py-0.5 rounded font-bold ${weekPercent >= 70 ? 'bg-green-100 text-green-700' : weekPercent >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}">${weekPercent}%</span>
+                        <span class="px-2 py-0.5 rounded font-bold ${weekPercent >= 70 ? 'bg-green-100 text-green-700' : weekPercent >= 40 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}">${weekPercent}%</span>
                     </div>
                 </div>
                 <table class="w-full text-sm">
-                    <thead class="bg-white border-b border-slate-100">
+                    <thead class="bg-slate-100 border-b-2 border-slate-200">
                         <tr>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-12">№</th>
+                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-10">№</th>
                             <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase flex-1">Задача</th>
                             <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-1/4">Продукт</th>
                             <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-1/5">Результат</th>
                             <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-20">Статус</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-50">
-                        ${week.tasks.map(task => `
-                            <tr class="hover:bg-slate-50">
-                                <td class="px-3 py-2 text-slate-700 font-medium w-12">${task.id}</td>
-                                <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
-                                <td class="px-3 py-2 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
-                                <td class="px-3 py-2 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
-                                <td class="px-3 py-2 w-20">
-                                    <span class="px-2 py-0.5 rounded text-xs font-bold ${getStatusClass(task.status)}">${task.status}</span>
-                                </td>
-                            </tr>
-                        `).join('')}
+                    <tbody class="divide-y divide-slate-100">
+                            ${week.tasks.map((task, taskIndex) => `
+                                <tr class="${taskIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-slate-100 border-b border-slate-100">
+                                    <td class="px-3 py-1.5 text-slate-700 font-medium w-10">${task.id}</td>
+                                    <td class="px-3 py-1.5 text-slate-900 font-medium break-words flex-1">${task.task}</td>
+                                    <td class="px-3 py-1.5 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
+                                    <td class="px-3 py-1.5 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
+                                    <td class="px-3 py-1.5 w-20">
+                                        <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                                    </td>
+                                </tr>
+                            `).join('')}
                     </tbody>
                 </table>
             </div>
@@ -956,23 +961,16 @@ const renderGoogleSheetsView = () => {
     
     return `
     <div class="animate-fade-in pb-24">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 pb-3 border-b border-slate-300">
-            <div>
-                <h1 class="text-lg sm:text-xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
-                    <i data-lucide="table" class="w-6 h-6 text-green-600"></i>
-                    Отчеты по отделам
-                </h1>
-                <p class="text-xs text-slate-500 mt-0.5">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="refreshAllDepartments()" class="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-1">
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i>
-                    Обновить все
-                </button>
-                <button onclick="navigate('select-dept')" class="text-xs font-bold uppercase text-slate-500 hover:text-slate-800 tracking-wide flex items-center gap-1">
-                    <i data-lucide="arrow-left" class="w-3 h-3"></i> Назад
-                </button>
-            </div>
+        <div class="flex flex-col items-center mb-4 pb-3 border-b-2 border-slate-300">
+            <h1 class="text-xl md:text-2xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                <i data-lucide="table" class="w-6 h-6 text-green-600"></i>
+                Отчеты
+            </h1>
+            <p class="text-xs text-slate-500 mt-2">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <button onclick="refreshAllDepartments()" class="mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold uppercase rounded flex items-center gap-2 shadow-md transition-all hover:shadow-lg">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                Обновить
+            </button>
         </div>
 
         <div id="sheetsConfigPanel" class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden mb-4">
@@ -1033,7 +1031,7 @@ const renderGoogleSheetsView = () => {
                         <span id="currentDepartmentTitle">НП</span>
                     </h2>
                     <div class="flex gap-2">
-                        <button onclick="importDepartment()" class="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1">
+                        <button onclick="importDepartment()" class="hidden text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1">
                             <i data-lucide="download" class="w-3 h-3"></i>
                             Импортировать
                         </button>
@@ -1212,13 +1210,13 @@ window.importDepartment = async () => {
 
 const parseDepartmentData = (rows, sheetName) => {
     if (!rows || rows.length === 0) return { weeks: [], stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
-    
+
     const weeks = [];
     let stats = { total: 0, completed: 0, inProgress: 0, notCompleted: 0 };
-    
+
     const weekRegex = /\d{2}\.\d{2}-\d{2}\.\d{2}/;
     const weekRegex2 = /\d{2}\.\d{2}\.\d{2} - \d{2}\.\d{2}\.\d{2}/;
-    
+
     const configs = {
         'НП': { dateCol: 2, format: 'np', taskCol: 2 },
         'ГИ': { dateCol: 1, format: 'gi', taskCol: 1 },
@@ -1228,14 +1226,32 @@ const parseDepartmentData = (rows, sheetName) => {
         'РОПР': { dateCol: 5, format: 'ropr', taskCol: 1 },
         'РСО': { dateCol: 2, format: 'rso', taskCol: 1 }
     };
-    
+
     const config = configs[sheetName] || { dateCol: 2, format: 'standard', taskCol: 2 };
-    
+
     // For РОМ - different format
     if (config.format === 'rom') {
         return { weeks: [{ name: 'Показатели', tasks: rows.slice(0, 10).map((r, i) => ({ id: i+1, task: r.join(' | ').substring(0, 100), product: '', status: 'Без статуса', comment: '' })) }], stats: { total: 10, completed: 0, inProgress: 0, notCompleted: 10 } };
     }
-    
+
+    // Get current month for filtering
+    const currentMonth = new Date().getMonth() + 1;
+
+    // Helper function to get end month from week date (for transition weeks)
+    const getEndMonthFromDate = (dateStr) => {
+        // Format: DD.MM-DD.MM.YY or DD.MM-DD.MM.YY.XX
+        const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})/);
+        if (parts) {
+            const startDay = parseInt(parts[1]);
+            const startMonth = parseInt(parts[2]);
+            const endDay = parseInt(parts[3]);
+            const endMonth = parseInt(parts[4]);
+            // If week starts in one month and ends in another, use end month
+            return endMonth;
+        }
+        return currentMonth;
+    };
+
     // Find all date rows and their positions
     const dateRows = [];
     rows.forEach((row, index) => {
@@ -1247,7 +1263,7 @@ const parseDepartmentData = (rows, sheetName) => {
             }
         }
     });
-    
+
     // For each date row, find the tasks after it
     dateRows.forEach((dateInfo, i) => {
         const nextDateRow = dateRows[i + 1]?.row || rows.length;
@@ -1273,8 +1289,12 @@ const parseDepartmentData = (rows, sheetName) => {
             });
             
             if (tasks.length > 0) {
-                weeks.push({ name: dateInfo.date, tasks: tasks });
-                tasks.forEach(task => updateStats(task, stats));
+                // Filter by current month (including transition weeks that end in current month)
+                const weekEndMonth = getEndMonthFromDate(dateInfo.date);
+                if (weekEndMonth === currentMonth) {
+                    weeks.push({ name: dateInfo.date, tasks: tasks });
+                    tasks.forEach(task => updateStats(task, stats));
+                }
             }
         }
     });
@@ -1354,13 +1374,13 @@ const renderDepartmentData = (department) => {
                 </td>
             </tr>
             ${week.tasks.map(task => `
-                <tr class="hover:bg-slate-50 border-b border-slate-100">
+                <tr class="hover:bg-slate-100 border-b border-slate-100">
                     <td class="px-3 py-2 text-slate-700 font-medium w-12">${task.id}</td>
                     <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
                     <td class="px-3 py-2 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
-                    <td class="px-3 py-2 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
-                    <td class="px-3 py-2 w-20">
-                        <span class="px-2 py-0.5 rounded text-xs font-bold ${getStatusClass(task.status)}">${task.status}</span>
+                    <td class="px-3 py-1.5 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
+                    <td class="px-3 py-1.5 w-20">
+                        <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
                     </td>
                 </tr>
               `).join('')}
@@ -1435,10 +1455,10 @@ const renderSheetsTable = (rows) => {
 };
 
 const getStatusClass = (status) => {
-    if (status?.toLowerCase().includes('выполн')) return 'bg-green-100 text-green-700';
-    if (status?.toLowerCase().includes('работе')) return 'bg-blue-100 text-blue-700';
-    if (status?.toLowerCase().includes('не выполн')) return 'bg-red-100 text-red-700';
-    return 'bg-slate-100 text-slate-600';
+    if (status?.toLowerCase().includes('выполн')) return 'bg-green-100 text-green-700 border-green-200';
+    if (status?.toLowerCase().includes('работе')) return 'bg-orange-100 text-orange-700 border-orange-200';
+    if (status?.toLowerCase().includes('не выполн')) return 'bg-red-100 text-red-700 border-red-200';
+    return 'bg-gray-100 text-gray-600 border-gray-200';
 };
 
 // --- INIT ---
