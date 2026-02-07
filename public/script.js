@@ -17,7 +17,48 @@ window.logout = () => {
 // Switch Korsovet/Plan Dnya mode
 window.switchKorsovetMode = (mode) => {
     state.korsovetMode = mode;
+    
+    // Если выбран режим "План дня руководителя", загружаем соответствующие данные
+    if (mode === 'plan_dnya') {
+        loadDirectorPlanData();
+    }
+    
     render();
+};
+
+// Функция для загрузки данных из таблицы "План дня руководителя"
+window.loadDirectorPlanData = async () => {
+    const directorPlanSpreadsheetId = '1LkYUZd5GlXixA8igGsjtQ-GFhEVqH2N1tU9x2vmJNDQ';
+    const sheetNames = ['НП', 'ГИ', 'КД', 'РОП', 'РОМ', 'РОПР', 'РСО'];
+
+    try {
+        const response = await fetch('/api/sheets/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                spreadsheetId: directorPlanSpreadsheetId,
+                sheetNames: sheetNames
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Обновляем данные отделов новыми данными из таблицы "План дня руководителя"
+            data.results.forEach(result => {
+                if (result.success) {
+                    departmentsData[result.sheetName] = parseDepartmentData(result.data, result.sheetName);
+                }
+            });
+
+            // Обновляем интерфейс
+            render();
+        } else {
+            console.error('Ошибка загрузки данных из таблицы План дня руководителя:', data.error);
+        }
+    } catch (error) {
+        console.error('Ошибка при загрузке данных из таблицы План дня руководителя:', error);
+    }
 };
 
 // --- UTILS ---
@@ -45,24 +86,12 @@ const checkDeadline = () => {
 
 // State
 const state = {
-    department: null,
     reportType: 'weekly',
     korsovetMode: 'korsovet',
     statusFilter: 'all',
     period: { week_dates: getWeekRange(), is_manual: false },
-    kpis: {
-        deals: { quantity: 0, description: '' },
-        meetings: { quantity: 0, description: '' },
-        training: { quantity: 0, description: '' }
-    },
-    kdIndicators: {},
-    tasks: [{ id: generateId(), task_text: '', product: '', status: 'Без статуса', comment: '', focus: false }],
-    unplannedTasks: [],
     history: [],
-    view: 'select-dept',
-    isLocked: false,
-    isSubmitting: false,
-    editingId: null,
+    view: 'sheets',
     deadlinePassed: false
 };
 
@@ -96,44 +125,6 @@ const api = {
 // --- ACTIONS ---
 window.updatePeriod = (val) => { state.period.week_dates = val; };
 window.toggleType = (type) => { state.reportType = type; };
-window.updateKpi = (key, field, val) => { state.kpis[key][field] = val; };
-window.updateKdIndicator = (key, field, val) => { state.kdIndicators[key][field] = val; };
-window.updateTask = (id, field, val) => {
-    const task = state.tasks.find(t => t.id === id);
-    if (task) task[field] = val;
-};
-window.updateUnplanned = (id, field, val) => {
-    const task = state.unplannedTasks.find(t => t.id === id);
-    if (task) task[field] = val;
-};
-window.addTask = () => {
-    if (state.isLocked) return;
-    state.tasks.push({ id: generateId(), task_text: '', product: '', status: 'Без статуса', comment: '', focus: false });
-    render();
-};
-window.removeTask = (id) => {
-    if (state.isLocked) return;
-    state.tasks = state.tasks.filter(t => t.id !== id);
-    render();
-};
-window.addUnplanned = () => {
-    if (state.isLocked) return;
-    state.unplannedTasks.push({ id: generateId(), task_text: '', product: '', status: 'Без статуса' });
-    render();
-};
-window.removeUnplanned = (id) => {
-    if (state.isLocked) return;
-    state.unplannedTasks = state.unplannedTasks.filter(t => t.id !== id);
-    render();
-};
-window.toggleTaskFocus = (id) => {
-    const task = state.tasks.find(t => t.id === id);
-    if (task) { task.focus = !task.focus; }
-};
-window.toggleUnplannedFocus = (id) => {
-    const task = state.unplannedTasks.find(t => t.id === id);
-    if (task) { task.focus = !task.focus; }
-};
 window.selectDirectorView = async () => {
     state.view = 'director';
     await api.fetchReports();
@@ -164,25 +155,39 @@ const renderGoogleSheetsDashboard = () => {
     
     return `
     <div class="animate-fade-in">
-        <div class="flex flex-col items-center mb-4 pb-3 border-b-2 border-slate-900">
-            <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
-                <i data-lucide="table" class="w-7 h-7 text-green-600"></i>
-                Отчеты
+        <div class="flex flex-col items-center mb-6 pb-4 border-b-2 border-green-600">
+            <h1 class="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3" role="banner">
+                <div class="p-3 bg-green-600 rounded-lg">
+                    <i data-lucide="table" class="w-8 h-8 text-white" aria-hidden="true"></i>
+                </div>
+                <span class="text-center">Отчеты</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-2">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <button onclick="loadAllDepartments()" class="mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold uppercase rounded flex items-center gap-2 shadow-md transition-all hover:shadow-lg">
-                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                Обновить
+            <p class="text-sm text-slate-600 mt-2 font-medium">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <button 
+                onclick="loadAllDepartments()" 
+                class="mt-3 px-6 py-3 bg-green-600 hover:bg-green-700 text-white text-base font-bold uppercase rounded-lg flex items-center gap-2 shadow-md transition-all hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-green-300" 
+                aria-label="Обновить данные о всех отделах"
+                tabindex="0">
+                <i data-lucide="refresh-cw" class="w-5 h-5" aria-hidden="true"></i>
+                Обновить все
             </button>
         </div>
 
-        <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden mb-4">
+        <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden mb-4" role="region" aria-labelledby="mode-selector">
             <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-center">
-                <div class="flex gap-1">
-                    <button onclick="switchKorsovetMode('korsovet')" class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all ${state.korsovetMode === 'korsovet' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}">
+                <div class="flex gap-1" id="mode-selector">
+                    <button 
+                        onclick="switchKorsovetMode('korsovet')" 
+                        class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-green-300 ${state.korsovetMode === 'korsovet' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}" 
+                        aria-pressed="${state.korsovetMode === 'korsovet'}"
+                        tabindex="0">
                         Корсовет
                     </button>
-                    <button onclick="switchKorsovetMode('plan_dnya')" class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all ${state.korsovetMode === 'plan_dnya' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}">
+                    <button 
+                        onclick="switchKorsovetMode('plan_dnya')" 
+                        class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-green-300 ${state.korsovetMode === 'plan_dnya' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}" 
+                        aria-pressed="${state.korsovetMode === 'plan_dnya'}"
+                        tabindex="0">
                         План дня руководителя
                     </button>
                 </div>
@@ -210,11 +215,74 @@ const renderGoogleSheetsDashboard = () => {
             </div>
         </div>
             <div class="overflow-x-auto custom-scrollbar">
-                ${renderDepartmentTasks(currentDepartment)}
+                ${state.korsovetMode === 'plan_dnya' ? `
+                    <div class="mb-4">
+                        <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg text-sm font-bold bg-white focus:outline-none focus:border-green-500 cursor-pointer">
+                            <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
+                            <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
+                            <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
+                            <option value="not_done" ${state.statusFilter === 'not_done' ? 'selected' : ''}>✕ Не выполнено</option>
+                        </select>
+                    </div>
+                    ${renderAllDepartmentsTasks()}
+                ` : renderDepartmentTasks(currentDepartment)}
             </div>
         </div>
     </div>
 `;
+};
+
+// Функция для отображения задач всех отделов в режиме "План дня руководителя"
+const renderAllDepartmentsTasks = () => {
+    let allTasksHtml = '';
+    
+    // Собираем задачи из всех отделов
+    for (const [deptName, deptData] of Object.entries(departmentsData)) {
+        if (deptData && deptData.weeks && deptData.weeks.length > 0) {
+            // Фильтруем задачи по статусу
+            const allWeekTasks = deptData.weeks.flatMap(week => week.tasks);
+            const filteredTasks = filterTasksByStatus(allWeekTasks, state.statusFilter);
+            
+            if (filteredTasks.length > 0) {
+                allTasksHtml += `
+                    <div class="mb-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-3 px-2 py-1 bg-slate-100 rounded">${deptName}</h3>
+                        <div class="space-y-3 p-3">
+                            ${filteredTasks.map(task => `
+                                <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                    <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
+                                        <span class="font-bold text-slate-700">#${task.id || 'N/A'}</span>
+                                        <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                                    </div>
+                                    <div class="p-3 space-y-2">
+                                        <div class="text-slate-900 font-medium">${task.task || ''}</div>
+                                        ${task.product ? `
+                                            <div class="text-sm">
+                                                <span class="text-slate-500 font-medium">📦 Продукт:</span>
+                                                <span class="text-slate-700 ml-1">${task.product}</span>
+                                            </div>
+                                        ` : ''}
+                                        ${task.comment ? `
+                                            <div class="text-sm">
+                                                <span class="text-slate-500 font-medium">💬 Комментарий:</span>
+                                                <span class="text-slate-700 ml-1">${task.comment}</span>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    if (!allTasksHtml) {
+        allTasksHtml = '<div class="p-8 text-center text-slate-400">Нет задач для отображения. Нажмите "Обновить" для загрузки.</div>';
+    }
+    
+    return allTasksHtml;
 };
 
 const filterTasksByStatus = (tasks, filter) => {
@@ -246,7 +314,16 @@ const renderDepartmentTasks = (department) => {
     if (!data || !data.weeks || data.weeks.length === 0) {
         return '<div class="p-8 text-center text-slate-400">Нет данных. Нажмите "Обновить" для загрузки.</div>';
     }
-
+    
+    // Special renderers for complex formats
+    if (department === 'РОПР') {
+        return renderRoPRDepartment(data);
+    }
+    
+    if (department === 'РСО') {
+        return renderRSODepartment(data);
+    }
+    
     const filterLabel = getStatusFilterLabel(state.statusFilter);
     
     return `
@@ -276,52 +353,26 @@ const renderDepartmentTasks = (department) => {
                     </div>
                 </div>
                 
-                <!-- Desktop Table -->
-                <table class="hidden sm:table w-full text-sm">
-                    <thead class="bg-slate-100 border-b-2 border-slate-200">
-                        <tr>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-10">№</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase flex-1">Задача</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-1/4">Продукт</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-1/5">Результат</th>
-                            <th class="px-3 py-2 text-left text-xs font-bold text-slate-600 uppercase w-20">Статус</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        ${filteredTasks.map(task => `
-                            <tr class="hover:bg-slate-100 border-b border-slate-100">
-                                <td class="px-3 py-2 text-slate-700 font-medium w-10">${task.id}</td>
-                                <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
-                                <td class="px-3 py-2 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
-                                <td class="px-3 py-2 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
-                                <td class="px-3 py-2 w-20">
-                                    <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                
-                <!-- Mobile Cards -->
-                <div class="sm:hidden space-y-3 p-3">
+                <!-- Task Cards (enhanced visual hierarchy and accessibility) -->
+                <div class="space-y-4 p-3" role="list" aria-label="Список задач">
                     ${filteredTasks.map(task => `
-                        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                            <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
-                                <span class="font-bold text-slate-700">#${task.id}</span>
-                                <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                        <div class="bg-white border-2 border-slate-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow" role="listitem" tabindex="0">
+                            <div class="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b-2 border-slate-200">
+                                <span class="font-extrabold text-slate-800 text-lg" aria-label="Номер задачи">#${task.id}</span>
+                                <span class="px-3 py-1 rounded-full text-sm font-bold border-2 ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
                             </div>
-                            <div class="p-3 space-y-2">
-                                <div class="text-slate-900 font-medium">${task.task}</div>
+                            <div class="p-4 space-y-3">
+                                <div class="text-slate-900 font-bold text-lg" aria-label="Описание задачи">${task.task}</div>
                                 ${task.product ? `
-                                    <div class="text-sm">
-                                        <span class="text-slate-500 font-medium">📦 Продукт:</span>
-                                        <span class="text-slate-700 ml-1">${task.product}</span>
+                                    <div class="flex items-start gap-2 text-base">
+                                        <span class="text-slate-500 font-semibold flex-shrink-0" aria-label="Продукт">📦 Продукт:</span>
+                                        <span class="text-slate-800 font-medium">${task.product}</span>
                                     </div>
                                 ` : ''}
                                 ${task.comment ? `
-                                    <div class="text-sm">
-                                        <span class="text-slate-500 font-medium">💬 Комментарий:</span>
-                                        <span class="text-slate-700 ml-1">${task.comment}</span>
+                                    <div class="flex items-start gap-2 text-base">
+                                        <span class="text-slate-500 font-semibold flex-shrink-0" aria-label="Комментарий">💬 Комментарий:</span>
+                                        <span class="text-slate-800 font-medium">${task.comment}</span>
                                     </div>
                                 ` : ''}
                             </div>
@@ -336,6 +387,114 @@ const renderDepartmentTasks = (department) => {
     `;
 }
 
+const renderRoPRDepartment = (data) => {
+    if (!data || !data.weeks || data.weeks.length === 0) {
+        return '<div class="p-8 text-center text-slate-400">Нет данных. Нажмите "Обновить" для загрузки.</div>';
+    }
+    
+    return data.weeks.map(week => `
+        <div class="border-b border-slate-200 last:border-0">
+            <div class="bg-green-50 px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-600 shadow-sm">
+                <span class="font-bold text-green-900 text-base">${week.period}</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-green-700">${week.stats?.completed || 0}/${week.stats?.total || 0}</span>
+                    <span class="px-3 py-1 font-bold text-white bg-green-600">${week.stats?.percent || '0%'}</span>
+                </div>
+            </div>
+            
+            <!-- Indicators -->
+            ${week.indicators.length > 0 ? `
+                <div class="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                    <div class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">ПОКАЗАТЕЛИ</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        ${week.indicators.map(ind => `
+                            <div class="bg-white border border-slate-200 p-2">
+                                <div class="text-xs text-slate-500 truncate">${ind.name}</div>
+                                <div class="text-sm font-bold text-slate-800">${ind.quantity || '-'}</div>
+                                ${ind.comment ? `<div class="text-xs text-slate-400 mt-1">${ind.comment}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            <!-- Past Week Tasks -->
+            ${week.pastTasks.length > 0 ? `
+                <div class="px-4 py-2 border-b border-slate-200 bg-slate-50">
+                    <div class="text-xs font-bold text-slate-600 uppercase tracking-wider">ЗАДАЧИ ПРОШЕДШЕЙ НЕДЕЛИ</div>
+                </div>
+                <div class="space-y-2 p-3">
+                    ${week.pastTasks.map(task => `
+                        <div class="bg-white border border-slate-200 p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-bold text-slate-700">#${task.id}</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status}</span>
+                            </div>
+                            <div class="text-sm text-slate-900 mb-1">${task.task}</div>
+                            ${task.result ? `<div class="text-xs text-slate-500">Результат: ${task.result}</div>` : ''}
+                            ${task.comment ? `<div class="text-xs text-slate-400 mt-1">${task.comment}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            
+            <!-- Current Week Tasks -->
+            ${week.currentTasks.length > 0 ? `
+                <div class="px-4 py-2 border-b border-slate-200 bg-slate-50">
+                    <div class="text-xs font-bold text-slate-600 uppercase tracking-wider">ЗАДАЧИ НА ТЕКУЩУЮ НЕДЕЛЮ</div>
+                </div>
+                <div class="space-y-2 p-3">
+                    ${week.currentTasks.map(task => `
+                        <div class="bg-white border border-slate-200 p-3">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-bold text-slate-700">#${task.id}</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status}</span>
+                            </div>
+                            <div class="text-sm text-slate-900 mb-1">${task.task}</div>
+                            ${task.result ? `<div class="text-xs text-slate-500">Результат: ${task.result}</div>` : ''}
+                            ${task.comment ? `<div class="text-xs text-slate-400 mt-1">${task.comment}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
+};
+
+const renderRSODepartment = (data) => {
+    if (!data || !data.weeks || data.weeks.length === 0) {
+        return '<div class="p-8 text-center text-slate-400">Нет данных</div>';
+    }
+    
+    return data.weeks.map(week => `
+        <div class="border-b border-slate-200 last:border-0">
+            <div class="bg-green-50 px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-600 shadow-sm">
+                <span class="font-bold text-green-900 text-base">${week.period}</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-green-700">${week.stats.completed}/${week.stats.total}</span>
+                    <span class="px-3 py-1 font-bold text-white bg-green-600">${week.stats.percent || '0%'}</span>
+                </div>
+            </div>
+            
+            <div class="space-y-2 p-3">
+                ${week.tasks.map(task => `
+                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                        <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
+                            <span class="font-bold text-slate-700">#${task.id}</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status}</span>
+                        </div>
+                        <div class="p-3 space-y-2">
+                            <div class="text-slate-900 font-medium">${task.task}</div>
+                            ${task.product ? `<div class="text-sm"><span class="text-slate-500">📦:</span><span class="text-slate-700 ml-1">${task.product}</span></div>` : ''}
+                            ${task.comment ? `<div class="text-sm"><span class="text-slate-500">💬:</span><span class="text-slate-700 ml-1">${task.comment}</span></div>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+};
+
 
 
 window.switchDepartment = (dept) => {
@@ -343,10 +502,10 @@ window.switchDepartment = (dept) => {
     state.statusFilter = 'all';
 
     document.querySelectorAll('.department-btn').forEach(btn => {
-        if (btn.dataset.dept === dept) {
+        if (btn && btn.dataset && btn.dataset.dept === dept) {
             btn.classList.add('border-green-600', 'bg-green-50');
             btn.classList.remove('border-slate-200');
-        } else {
+        } else if (btn) {
             btn.classList.remove('border-green-600', 'bg-green-50');
             btn.classList.add('border-slate-200');
         }
@@ -370,7 +529,21 @@ window.setStatusFilter = (filter) => {
     state.statusFilter = filter;
     const container = document.querySelector('.overflow-x-auto.custom-scrollbar');
     if (container) {
-        container.innerHTML = renderDepartmentTasks(currentDepartment);
+        if (state.korsovetMode === 'plan_dnya') {
+            container.innerHTML = `
+                <div class="mb-4">
+                    <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg text-sm font-bold bg-white focus:outline-none focus:border-green-500 cursor-pointer">
+                        <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
+                        <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
+                        <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
+                        <option value="not_done" ${state.statusFilter === 'not_done' ? 'selected' : ''}>✕ Не выполнено</option>
+                    </select>
+                </div>
+                ${renderAllDepartmentsTasks()}
+            `;
+        } else {
+            container.innerHTML = renderDepartmentTasks(currentDepartment);
+        }
     }
     const filterSelect = document.getElementById('statusFilterSelect');
     if (filterSelect) filterSelect.value = filter;
@@ -384,127 +557,23 @@ window.setDashboardFilter = (type) => {
     render();
 };
 
-window.submitReport = async () => {
-    if (state.isLocked || state.isSubmitting) return;
-    
-    state.isSubmitting = true;
-    render();
 
-    const total = state.tasks.length;
-    const done = state.tasks.filter(t => t.status === 'Выполнено').length;
-    const report = {
-        id: state.editingId || generateId(),
-        department: state.department,
-        report_type: state.reportType,
-        period: { ...state.period },
-        kpi_indicators: { ...state.kpis },
-        tasks: [...state.tasks],
-        unplanned_tasks: [...state.unplannedTasks],
-        calculated_stats: { done, total, percent: total > 0 ? Math.round((done/total)*100) : 0 },
-        created_at: new Date().toISOString()
-    };
 
-    try {
-        const res = await fetch('/api/reports', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(report)
-        });
-        if (res.ok) {
-            await api.fetchReports();
-            state.isLocked = true;
-            state.editingId = report.id;
-        }
-    } catch (e) {
-        console.error(e);
-    }
-    state.isSubmitting = false;
-    render();
-};
 
-window.resetForm = () => {
-    state.isLocked = false;
-    state.editingId = null;
-    state.tasks = [{ id: generateId(), task_text: '', product: '', status: 'Без статуса', comment: '', focus: false }];
-    state.unplannedTasks = [];
-    state.period.week_dates = getWeekRange();
-    if (state.department === 'КД') {
-        state.kdIndicators = {
-            contracts_count: { quantity: 0, description: '' },
-            contracts_amount: { quantity: 0, description: '' },
-            deals_in_work: { quantity: 0, amount: 0, description: '' },
-            tenders_in_work: { quantity: 0, amount: 0, description: '' },
-            effective_calls: { quantity: 0, description: '' },
-            tcp_sent: { quantity: 0, description: '' },
-            turnover_plan: { quantity: 0, description: '' },
-            margin_plan: { quantity: 0, description: '' },
-            meetings_op: { quantity: 0, description: '' },
-            trainings_op: { quantity: 0, description: '' },
-            applications_tki: { quantity: 0, description: '' },
-            calculated_applications: { quantity: 0, description: '' }
-        };
-        state.kpis = { deals: { quantity: 0, description: '' }, meetings: { quantity: 0, description: '' }, training: { quantity: 0, description: '' } };
-    } else {
-        state.kpis = { deals: { quantity: 0, description: '' }, meetings: { quantity: 0, description: '' }, training: { quantity: 0, description: '' } };
-    }
-    render();
-};
-
-window.selectDept = (dept) => {
-    state.department = dept;
-    state.reportType = 'weekly';
-    state.period.week_dates = getWeekRange();
-    
-    if (dept === 'КД') {
-        state.kdIndicators = {
-            contracts_count: { quantity: 0, description: '' },
-            contracts_amount: { quantity: 0, description: '' },
-            deals_in_work: { quantity: 0, amount: 0, description: '' },
-            tenders_in_work: { quantity: 0, amount: 0, description: '' },
-            effective_calls: { quantity: 0, description: '' },
-            tcp_sent: { quantity: 0, description: '' },
-            turnover_plan: { quantity: 0, description: '' },
-            margin_plan: { quantity: 0, description: '' },
-            meetings_op: { quantity: 0, description: '' },
-            trainings_op: { quantity: 0, description: '' },
-            applications_tki: { quantity: 0, description: '' },
-            calculated_applications: { quantity: 0, description: '' }
-        };
-        state.tasks = [];
-        state.kpis = { deals: { quantity: 0, description: '' }, meetings: { quantity: 0, description: '' }, training: { quantity: 0, description: '' } };
-    } else if (dept === 'ГИ') {
-        state.tasks = [];
-        state.kpis = { deals: { quantity: 0, description: '' }, meetings: { quantity: 0, description: '' }, training: { quantity: 0, description: '' } };
-    } else {
-        state.tasks = [{ id: generateId(), task_text: '', product: '', status: 'Без статуса', comment: '', focus: false }];
-        state.kdIndicators = {};
-    }
-    state.unplannedTasks = [];
-    state.view = 'create';
-    render();
-};
-
-window.editReport = (id) => {
-    const report = state.history.find(r => r.id === id);
-    if (!report) return;
-    
-    state.editingId = report.id;
-    state.department = report.department;
-    state.reportType = report.report_type;
-    state.period = { ...report.period };
-    state.kpis = { ...report.kpi_indicators };
-    state.tasks = report.tasks.map(t => ({ ...t }));
-    state.unplannedTasks = report.unplanned_tasks.map(t => ({ ...t }));
-    state.view = 'create';
-    render();
-};
 
 // --- RENDER FUNCTIONS ---
 const render = () => {
     if (typeof lucide !== 'undefined') lucide.createIcons();
     const app = document.getElementById('app');
-    let content = '';
     
+    // Проверяем, существует ли элемент app перед тем, как изменять его содержимое
+    if (!app) {
+        console.error('Элемент с ID "app" не найден в DOM');
+        return;
+    }
+    
+    let content = '';
+
     content += `<div id="banner"></div>`;
 
     content += `
@@ -512,7 +581,7 @@ const render = () => {
         <button onclick="navigate('sheets')" class="flex flex-col items-center justify-center p-3 w-full font-bold uppercase tracking-wider text-[10px] ${state.view === 'sheets' ? 'bg-green-600 text-white' : 'bg-white text-slate-500'} touch-manipulation">
             <i data-lucide="table" class="mb-1 w-5 h-5"></i> Отчеты
         </button>
-        <button onclick="navigate('select-dept')" class="flex flex-col items-center justify-center p-3 w-full font-bold uppercase tracking-wider text-[10px] ${state.view === 'create' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'} touch-manipulation">
+        <button onclick="navigate('create')" class="flex flex-col items-center justify-center p-3 w-full font-bold uppercase tracking-wider text-[10px] ${state.view === 'create' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'} touch-manipulation">
             <i data-lucide="file-edit" class="mb-1 w-5 h-5"></i> Заполнить
         </button>
         <button onclick="selectDirectorView()" class="flex flex-col items-center justify-center p-3 w-full font-bold uppercase tracking-wider text-[10px] ${state.view === 'director' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'} touch-manipulation">
@@ -522,134 +591,19 @@ const render = () => {
 
     content += `<div class="max-w-4xl mx-auto p-2 sm:p-4 md:p-8 space-y-4 sm:space-y-6 pb-20 sm:pb-8">`;
 
-    if (state.view === 'select-dept') {
-        content = renderDeptSelector();
-    } else if (state.view === 'director') {
+    if (state.view === 'director') {
         content = renderDirectorView();
     } else {
         content = renderGoogleSheetsDashboard();
     }
 
     content += `</div>`;
-    
+
     app.innerHTML = content;
     if (typeof lucide !== 'undefined') lucide.createIcons();
 };
 
-const renderDeptSelector = () => {
-    return `
-    <div class="min-h-screen bg-slate-50 flex items-center justify-center p-2 sm:p-4">
-        <div class="max-w-2xl w-full bg-white shadow-lg border-2 border-slate-900 p-3 sm:p-6 md:p-10 animate-fade-in">
-            <h1 class="text-xl sm:text-3xl font-extrabold text-center mb-3 sm:mb-2 uppercase tracking-tight text-slate-900">Выберите отдел</h1>
-            <div class="grid grid-cols-3 sm:grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-3 max-h-[60vh] sm:max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar mt-3 sm:mt-6">
-                ${DEPARTMENTS.map(dept => `
-                    <button onclick="selectDept('${dept}')" class="group relative flex flex-col items-center justify-center p-2 sm:p-4 border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 transition-all active:scale-95 touch-manipulation min-h-[50px] sm:min-h-[80px]">
-                        <span class="font-extrabold text-slate-700 text-xs sm:text-lg group-hover:text-indigo-700">${dept}</span>
-                    </button>
-                `).join('')}
-            </div>
-            <div class="mt-3 sm:mt-6 text-center space-y-2">
-                <button onclick="navigate('sheets')" class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold uppercase tracking-wider text-xs flex items-center justify-center touch-manipulation">
-                    <i data-lucide="table" class="mr-1.5 w-4 h-4"></i> Отчеты Google
-                </button>
-                <button onclick="selectDirectorView()" class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold uppercase tracking-wider text-xs flex items-center justify-center touch-manipulation">
-                    <i data-lucide="eye" class="mr-1.5 w-4 h-4"></i> Режим директора
-                </button>
-            </div>
-        </div>
-    </div>`;
-};
 
-const renderForm = () => {
-    return `
-    <div class="space-y-3 sm:space-y-6 animate-fade-in ${state.isLocked ? 'opacity-80' : ''}">
-        <header class="bg-white border-2 border-slate-900 relative shadow-[4px_4px_0px_0px_rgba(15,23,42,0.1)]">
-            ${state.isLocked ? '<div class="absolute inset-0 z-10 bg-slate-100/50 cursor-not-allowed"></div>' : ''}
-            <div class="bg-slate-900 text-white p-3 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                <div class="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 bg-indigo-600 flex items-center justify-center shrink-0 border-2 border-white/20 shadow-lg">
-                       <i data-lucide="building-2" class="text-white w-6 h-6 sm:w-8 sm:h-8"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-indigo-300 mb-1">Отдел</div>
-                        <div class="text-2xl sm:text-4xl font-black uppercase tracking-tight leading-none text-white truncate">${state.department}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="p-3 sm:p-6 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6 border-t-4 border-indigo-600">
-                <div class="flex flex-col gap-2 w-full sm:w-auto">
-                     <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Тип отчета</p>
-                     <div class="flex items-center gap-0 bg-white border-2 border-slate-200 p-1 rounded-none shadow-sm w-full sm:w-fit">
-                        <button onclick="toggleType('weekly')" class="flex-1 sm:flex-none px-3 sm:px-6 py-2.5 sm:py-2 text-xs sm:text-xs font-bold uppercase tracking-wider transition-all ${state.reportType === 'weekly' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}">Неделя</button>
-                        <button onclick="toggleType('monthly')" class="flex-1 sm:flex-none px-3 sm:px-6 py-2.5 sm:py-2 text-xs sm:text-xs font-bold uppercase tracking-wider transition-all ${state.reportType === 'monthly' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-600'}">Месяц</button>
-                    </div>
-                </div>
-                <div class="w-full sm:w-auto flex flex-col items-start sm:items-end">
-                     <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">${state.reportType === 'weekly' ? 'Период' : 'Месяц'}</p>
-                     <div class="w-full sm:w-auto flex items-center gap-2 sm:gap-3 bg-white px-3 sm:px-4 py-2.5 sm:py-3 border-2 border-slate-900 shadow-sm hover:border-indigo-600 transition-colors">
-                        <i data-lucide="calendar" class="${state.reportType === 'monthly' ? 'text-indigo-600' : 'text-slate-900'} w-5 h-5 sm:w-6 sm:h-6"></i>
-                        <input type="text" value="${state.period.week_dates}" onchange="updatePeriod(this.value)" ${state.isLocked ? 'disabled' : ''} class="bg-transparent border-none p-0 text-sm sm:text-xl font-extrabold focus:outline-none w-full sm:w-44 font-mono uppercase truncate" />
-                     </div>
-                </div>
-            </div>
-        </header>
-
-        ${state.department === 'КД' ? `
-        <section class="space-y-3 sm:space-y-4">
-            <h2 class="text-base sm:text-xl font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide"><i data-lucide="bar-chart-3" class="text-blue-600 w-5 h-5"></i>Показатели</h2>
-            <div class="bg-white border-2 border-slate-300 space-y-0 divide-y divide-slate-200">
-                ${renderKdIndicatorRow('contracts_count', 'Кол. контрактов', 'file-text', 'blue')}
-                ${renderKdIndicatorRow('contracts_amount', 'Сумма контрактов', 'dollar-sign', 'blue')}
-                ${renderKdDoubleIndicatorRow('deals_in_work', 'Сделки в работе', 'trending-up', 'blue')}
-                ${renderKdDoubleIndicatorRow('tenders_in_work', 'Тендеры в работе', 'briefcase', 'blue')}
-                ${renderKdIndicatorRow('effective_calls', 'Звонки ОП', 'phone', 'blue')}
-                ${renderKdIndicatorRow('tcp_sent', 'ТКП направлено', 'send', 'blue')}
-                ${renderKdIndicatorRow('turnover_plan', 'План оборота', 'target', 'blue')}
-                ${renderKdIndicatorRow('margin_plan', 'План маржи', 'percent', 'blue')}
-                ${renderKdIndicatorRow('meetings_op', 'Планерки ОП', 'users', 'blue')}
-                ${renderKdIndicatorRow('trainings_op', 'Обучения ОП', 'graduation-cap', 'blue')}
-                ${renderKdIndicatorRow('applications_tki', 'Заявок ТКИ', 'clipboard', 'blue')}
-                ${renderKdIndicatorRow('calculated_applications', 'Рассчитано', 'calculator', 'blue')}
-            </div>
-        </section>
-        ` : state.department !== 'ГИ' ? `
-        <section class="space-y-3 sm:space-y-4">
-            <h2 class="text-base sm:text-xl font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide"><i data-lucide="bar-chart-3" class="text-blue-600 w-5 h-5"></i>Показатели</h2>
-            <div class="bg-white border-2 border-slate-300">
-                 ${renderKpiRow('deals', 'Сделки', 'briefcase', 'blue')}
-                 ${renderKpiRow('meetings', 'Планерки', 'users', 'blue')}
-                 ${renderKpiRow('training', 'Обучение', 'graduation-cap', 'blue')}
-            </div>
-        </section>` : ''}
-
-        ${state.department !== 'ГИ' ? `
-        <section class="space-y-3 sm:space-y-4">
-             <h2 class="text-base sm:text-xl font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide"><i data-lucide="check-circle-2" class="text-emerald-600 w-5 h-5"></i>Задачи</h2>
-             <div class="space-y-3 sm:space-y-4">
-                ${state.tasks.map((task, i) => renderTaskRow(task, i)).join('')}
-             </div>
-             ${!state.isLocked ? `<button onclick="addTask()" class="w-full py-4 border-2 border-dashed border-slate-400 text-slate-500 hover:border-slate-900 hover:text-slate-900 hover:bg-slate-50 transition-all font-bold uppercase tracking-wide flex items-center justify-center text-sm touch-manipulation"><i data-lucide="plus" class="mr-2 w-4 h-4"></i> Добавить задачу</button>` : ''}
-        </section>` : ''}
-
-        <section class="space-y-3 sm:space-y-4">
-             <h2 class="text-base sm:text-xl font-bold text-slate-900 flex items-center gap-2 uppercase tracking-wide"><i data-lucide="alert-circle" class="text-amber-600 w-5 h-5"></i>Вне плана</h2>
-             <div class="bg-amber-50 border-2 border-amber-200 p-3 sm:p-6 space-y-3 sm:space-y-4">
-                ${state.unplannedTasks.length === 0 ? '<p class="text-sm text-slate-400 text-center py-2 font-medium">Нет незапланированных задач</p>' : ''}
-                ${state.unplannedTasks.map(task => renderUnplannedRow(task)).join('')}
-                ${!state.isLocked ? `<button onclick="addUnplanned()" class="w-full sm:w-auto bg-white border-2 border-amber-500 text-amber-700 hover:bg-amber-500 hover:text-white font-bold py-3 px-6 uppercase text-xs tracking-wider transition-colors flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(245,158,11,0.2)] touch-manipulation"><i data-lucide="plus" class="mr-2 w-4 h-4"></i> Добавить</button>` : ''}
-             </div>
-        </section>
-
-        <footer class="bg-slate-900 text-white p-4 sm:p-6 md:p-8 border-t-4 border-indigo-500 mb-4 sm:mb-8 flex justify-center">
-            ${state.isLocked 
-                ? `<button onclick="resetForm()" class="w-full max-w-md bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-6 uppercase tracking-widest text-sm flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)] touch-manipulation"><i data-lucide="refresh-cw" class="mr-3"></i> Сменить отдел</button>`
-                : `<button onclick="submitReport()" ${state.isSubmitting ? 'disabled' : ''} class="w-full max-w-md bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-6 uppercase tracking-widest text-sm flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)] touch-manipulation">
-                    ${state.isSubmitting ? '<i data-lucide="loader-2" class="mr-3 animate-spin"></i> Сохранение...' : `<i data-lucide="save" class="mr-3"></i> ${state.editingId ? 'Обновить' : 'Сохранить'}`}
-                  </button>`
-            }
-        </footer>
-    </div>`;
-};
 
 const renderKpiRow = (key, title, icon, color) => {
     return `
@@ -778,7 +732,7 @@ const renderReportItemCompact = (report) => {
     
     return `
     <div class="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow rounded-lg overflow-hidden">
-        <div onclick="document.getElementById('${domId}').classList.toggle('hidden'); if(typeof lucide!=='undefined')lucide.createIcons();" class="p-3 cursor-pointer bg-white hover:bg-slate-50">
+        <div onclick="var el=document.getElementById('${domId}'); if(el) el.classList.toggle('hidden'); if(typeof lucide!=='undefined')lucide.createIcons();" class="p-3 cursor-pointer bg-white hover:bg-slate-50">
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0">
                     <div class="p-2 bg-slate-100 border border-slate-200 rounded shrink-0">
@@ -1166,8 +1120,10 @@ window.connectGoogleSheets = async () => {
         
         if (data.success) {
             currentSpreadsheetId = data.spreadsheetId;
-            document.getElementById('sheetsStatus').classList.remove('hidden');
-            document.getElementById('connectedInfo').textContent = data.title || 'Таблица подключена';
+            const sheetsStatusEl = document.getElementById('sheetsStatus');
+            if (sheetsStatusEl) sheetsStatusEl.classList.remove('hidden');
+            const connectedInfoEl = document.getElementById('connectedInfo');
+            if (connectedInfoEl) connectedInfoEl.textContent = data.title || 'Таблица подключена';
             await loadAllDepartments();
         } else {
             alert('Ошибка: ' + data.error);
@@ -1178,10 +1134,18 @@ window.connectGoogleSheets = async () => {
 };
 
 window.loadAllDepartments = async () => {
-    // Use encoded sheet names to avoid Unicode issues
-    const sheetNames = ['НП', 'ГИ', 'КД', 'РОП', 'РОМ', 'РОПР', 'РСО'];
+    const gridElement = document.getElementById('departmentGrid');
+    if (gridElement) {
+        gridElement.innerHTML = `
+            <div class="flex items-center justify-center p-8 col-span-full" role="status" aria-live="polite">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600 mr-4"></div>
+                <span class="text-lg font-bold text-slate-700">Загрузка данных отделов...</span>
+            </div>`;
+    }
     
     try {
+        const sheetNames = ['НП', 'ГИ', 'КД', 'РОП', 'РОМ', 'РОПР', 'РСО'];
+
         const response = await fetch('/api/sheets/batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1190,9 +1154,9 @@ window.loadAllDepartments = async () => {
                 sheetNames: sheetNames
             })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             departmentsData = {};
             data.results.forEach(result => {
@@ -1200,15 +1164,35 @@ window.loadAllDepartments = async () => {
                     departmentsData[result.sheetName] = parseDepartmentData(result.data, result.sheetName);
                 }
             });
-            
-            renderDepartmentData(currentDepartment);
-            document.getElementById('sheetsStatus').classList.remove('hidden');
-            document.getElementById('connectedInfo').textContent = `Загружено ${Object.keys(departmentsData).length} отделов`;
+
+            render();
+            const sheetsStatusEl = document.getElementById('sheetsStatus');
+            if (sheetsStatusEl) sheetsStatusEl.classList.remove('hidden');
+            const connectedInfoEl = document.getElementById('connectedInfo');
+            if (connectedInfoEl) connectedInfoEl.textContent = `Загружено ${Object.keys(departmentsData).length} отделов`;
         } else {
-            alert('Ошибка загрузки: ' + data.error);
+            // Показать сообщение об ошибке
+            if (gridElement) {
+                gridElement.innerHTML = `
+                    <div class="col-span-full text-center py-8">
+                        <div class="text-red-600 font-bold text-lg mb-2">Ошибка загрузки данных</div>
+                        <p class="text-slate-600">Произошла ошибка при загрузке данных отделов. Пожалуйста, попробуйте еще раз.</p>
+                        <button onclick="loadAllDepartments()" class="mt-4 px-6 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300">Повторить попытку</button>
+                    </div>`;
+            }
+            console.error('Ошибка загрузки:', data.error);
         }
     } catch (e) {
-        alert('Ошибка: ' + e.message);
+        // Показать сообщение об ошибке
+        if (gridElement) {
+            gridElement.innerHTML = `
+                <div class="col-span-full text-center py-8">
+                    <div class="text-red-600 font-bold text-lg mb-2">Ошибка подключения</div>
+                    <p class="text-slate-600">Не удалось подключиться к серверу. Проверьте подключение к интернету и попробуйте еще раз.</p>
+                    <button onclick="loadAllDepartments()" class="mt-4 px-6 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300">Повторить попытку</button>
+                </div>`;
+        }
+        console.error('Ошибка:', e.message);
     }
 };
 
@@ -1228,7 +1212,7 @@ window.selectDepartmentTab = (sheetName) => {
     document.getElementById('currentDepartmentTitle').textContent = sheetName;
     
     // Render data
-    renderDepartmentData(sheetName);
+    render();
 };
 
 window.refreshDepartment = async () => {
@@ -1246,7 +1230,7 @@ window.refreshDepartment = async () => {
         
         if (data.success) {
             departmentsData[currentDepartment] = parseDepartmentData(data.rows);
-            renderDepartmentData(currentDepartment);
+            render();
         } else {
             alert('Ошибка обновления: ' + data.error);
         }
@@ -1289,6 +1273,18 @@ window.importDepartment = async () => {
 const parseDepartmentData = (rows, sheetName) => {
     if (!rows || rows.length === 0) return { weeks: [], stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
 
+    // Проверяем, является ли это данными из таблицы "План дня руководителя"
+    // В этой таблице структура может отличаться, поэтому добавим специальную обработку
+    // Проверяем по характерным признакам структуры данных из таблицы "План дня"
+    if (rows.length > 0 && (
+        (rows[0] && rows[0].some(cell => cell && typeof cell === 'string' && cell.includes('План дня'))) || 
+        (rows.length > 2 && rows[2] && rows[2].some(cell => cell && typeof cell === 'string' && cell.includes('План дня'))) ||
+        (rows.length > 0 && rows[0] && rows[0].some(cell => cell && typeof cell === 'string' && cell.includes('тДЦ'))) || // проверяем наличие символа галочки в структуре
+        (rows.length > 0 && rows[0] && rows[0][0] === '0' && rows[0].length >= 6) // проверяем характерную структуру данных "План дня" (начинается с "0","","","дата","","день недели")
+    )) {
+        return parseDirectorPlanData(rows, sheetName);
+    }
+
     const weeks = [];
     let stats = { total: 0, completed: 0, inProgress: 0, notCompleted: 0 };
 
@@ -1312,8 +1308,19 @@ const parseDepartmentData = (rows, sheetName) => {
         return { weeks: [{ name: 'Показатели', tasks: rows.slice(0, 10).map((r, i) => ({ id: i+1, task: r.join(' | ').substring(0, 100), product: '', status: 'Без статуса', comment: '' })) }], stats: { total: 10, completed: 0, inProgress: 0, notCompleted: 10 } };
     }
 
+    // For РОПР - special complex format with indicators, past tasks, current tasks
+    if (config.format === 'ropr') {
+        return parseRoPRData(rows);
+    }
+    
+    // For РСО - format with week type and 4 columns
+    if (config.format === 'rso') {
+        return parseRSOData(rows);
+    }
+
     // Get current month for filtering
     const currentMonth = new Date().getMonth() + 1;
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
 
     // Helper function to get end month from week date (for transition weeks)
     const getEndMonthFromDate = (dateStr) => {
@@ -1367,9 +1374,10 @@ const parseDepartmentData = (rows, sheetName) => {
             });
             
             if (tasks.length > 0) {
-                // Filter by current month (including transition weeks that end in current month)
+                // Filter by current and previous month only
                 const weekEndMonth = getEndMonthFromDate(dateInfo.date);
-                if (weekEndMonth === currentMonth) {
+                const monthsToShow = [currentMonth, prevMonth];
+                if (monthsToShow.includes(weekEndMonth)) {
                     weeks.push({ name: dateInfo.date, tasks: tasks });
                     tasks.forEach(task => updateStats(task, stats));
                 }
@@ -1379,10 +1387,12 @@ const parseDepartmentData = (rows, sheetName) => {
 
     // Sort weeks by date (newest first)
     const parseWeekDate = (dateStr) => {
-        const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2})/);
+        const yearMatch = dateStr.match(/\.(\d{2})$/);
+        const year = yearMatch ? '20' + yearMatch[1] : '2025';
+        const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})/);
         if (parts) {
-            const [, d1, m1, d2, m2, y] = parts;
-            return new Date('20' + y, parseInt(m2) - 1, parseInt(d2));
+            const [, d1, m1, d2, m2] = parts;
+            return new Date(year, parseInt(m2) - 1, parseInt(d2));
         }
         return new Date(0);
     };
@@ -1390,6 +1400,208 @@ const parseDepartmentData = (rows, sheetName) => {
     weeks.sort((a, b) => parseWeekDate(b.name) - parseWeekDate(a.name));
 
     return { weeks, stats };
+};
+
+// Специальная функция для обработки данных из таблицы "План дня руководителя"
+const parseDirectorPlanData = (rows, sheetName) => {
+    if (!rows || rows.length === 0) return { weeks: [], stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
+
+    // Для таблицы "План дня руководителя" структура может быть иной
+    // Обычно это текущие задачи без разделения по неделям
+    
+    const tasks = [];
+    let stats = { total: 0, completed: 0, inProgress: 0, notCompleted: 0 };
+
+    // Пропускаем заголовки (первые несколько строк)
+    const startIndex = rows.findIndex(row => 
+        row.some(cell => 
+            cell && typeof cell === 'string' && 
+            (cell.toLowerCase().includes('задача') || 
+             cell.toLowerCase().includes('статус') || 
+             cell.toLowerCase().includes('результат'))
+        )
+    );
+    
+    const dataRows = startIndex >= 0 ? rows.slice(startIndex + 1) : rows;
+
+    // Обрабатываем строки с задачами
+    dataRows.forEach((row, index) => {
+        if (row && row.length >= 3) { // Должно быть как минимум ID, задача и статус
+            const task = {
+                id: row[0] || index + 1,
+                task: row[1] || '',
+                product: row[2] || '',
+                status: row[3] || 'Без статуса',
+                comment: row[4] || ''
+            };
+
+            if (task.task && task.task.trim() !== '') {
+                tasks.push(task);
+                
+                // Обновляем статистику
+                stats.total++;
+                const statusLower = task.status.toLowerCase();
+                if (statusLower.includes('выполн') || statusLower.includes('done')) {
+                    stats.completed++;
+                } else if (statusLower.includes('работе') || statusLower.includes('progress')) {
+                    stats.inProgress++;
+                } else if (statusLower.includes('не выполн') || statusLower.includes('not done')) {
+                    stats.notCompleted++;
+                } else {
+                    // Без статуса
+                }
+            }
+        }
+    });
+
+    // Создаем одну "неделю" с текущими задачами
+    const currentDate = new Date();
+    const currentWeekRange = getWeekRange(); // используем функцию для получения текущего диапазона недели
+    
+    return {
+        weeks: [{
+            name: currentWeekRange,
+            tasks: tasks
+        }],
+        stats: stats
+    };
+};
+
+const parseRoPRData = (rows) => {
+    const weeks = [];
+    const currentMonth = new Date().getMonth() + 1;
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    
+    const weekRegex = /\d{2}\.\d{2}-\d{2}\.\d{2}/;
+    const sectionRegex = /(ПОКАЗАТЕЛИ|ЗАДАЧИ ПРОШЕДШЕЙ НЕДЕЛИ|ЗАДАЧИ НА ТЕКУЩУЮ НЕДЕЛЮ)/i;
+    
+    // Find all week blocks
+    let currentBlock = null;
+    let currentSection = null;
+    
+    rows.forEach((row, index) => {
+        const rowText = row.join(' | ');
+        
+        // Check if this is a week date row
+        for (let i = 0; i < row.length; i++) {
+            if (weekRegex.test(row[i])) {
+                const dateMatch = row[i].match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})/);
+                const month = dateMatch ? parseInt(dateMatch[4]) : currentMonth;
+                
+                // Show current month and previous month
+                if (month === currentMonth || month === prevMonth) {
+                    if (currentBlock) {
+                        weeks.push(currentBlock);
+                    }
+                    currentBlock = {
+                        period: row[i],
+                        indicators: [],
+                        pastTasks: [],
+                        currentTasks: [],
+                        unplannedTasks: [],
+                        stats: { completed: 0, total: 0, percent: '0%' }
+                    };
+                    currentSection = null;
+                }
+                break;
+            }
+        }
+        
+        if (!currentBlock) return;
+        
+        // Check for section headers
+        const sectionMatch = rowText.match(sectionRegex);
+        if (sectionMatch) {
+            const section = sectionMatch[1].toUpperCase();
+            if (section === 'ПОКАЗАТЕЛИ') currentSection = 'indicators';
+            else if (section === 'ЗАДАЧИ ПРОШЕДШЕЙ НЕДЕЛИ') currentSection = 'pastTasks';
+            else if (section === 'ЗАДАЧИ НА ТЕКУЩУЮ НЕДЕЛЮ') currentSection = 'currentTasks';
+            return;
+        }
+        
+        // Parse indicators (row has content in col 1 and col 6)
+        if (currentSection === 'indicators') {
+            const name = row[1]?.trim();
+            const quantity = row[6]?.trim();
+            const comment = row[11]?.trim();
+            if (name && name !== 'КОЛИЧЕСТВО' && name !== 'КОММЕНТАРИЙ' && name !== 'ПОКАЗАТЕЛИ') {
+                // Check if it's a number row or a split row
+                if (quantity && !isNaN(parseFloat(quantity.replace(',', '.')))) {
+                    currentBlock.indicators.push({ name, quantity, comment: '' });
+                } else if (row[7]?.trim() && row[9]?.trim()) {
+                    // Split row like "Офис | 4 | Производство | 5"
+                    currentBlock.indicators.push({ name: name + ' (Офис)', quantity: row[7], comment: '' });
+                    currentBlock.indicators.push({ name: name + ' (Производство)', quantity: row[9], comment: '' });
+                } else if (quantity || comment) {
+                    currentBlock.indicators.push({ name, quantity: quantity || '', comment: comment || '' });
+                }
+            }
+        }
+        
+        // Parse tasks (row starts with a number)
+        if ((currentSection === 'pastTasks' || currentSection === 'currentTasks' || currentSection === 'unplannedTasks') && row[0]?.trim()) {
+            const id = parseInt(row[0]);
+            if (!isNaN(id)) {
+                const task = {
+                    id,
+                    task: row[1]?.trim() || '',
+                    result: row[6]?.trim() || '',
+                    status: row[8]?.trim() || 'Без статуса',
+                    comment: row[11]?.trim() || ''
+                };
+                if (task.task) {
+                    if (currentSection === 'pastTasks') currentBlock.pastTasks.push(task);
+                    else if (currentSection === 'currentTasks') currentBlock.currentTasks.push(task);
+                    else if (currentSection === 'unplannedTasks') currentBlock.unplannedTasks.push(task);
+                    
+                    currentBlock.stats.total++;
+                    if (task.status.toLowerCase().includes('выполнено')) currentBlock.stats.completed++;
+                }
+            }
+        }
+        
+        // Parse stats row
+        if (rowText.includes('из') && rowText.includes('%')) {
+            const statsMatch = rowText.match(/из\s*(\d+).*?(\d+[,.]?\d*)%/);
+            if (statsMatch) {
+                currentBlock.stats.completed = parseInt(statsMatch[1]);
+                currentBlock.stats.percent = statsMatch[2] + '%';
+            }
+        }
+    });
+    
+    if (currentBlock) weeks.push(currentBlock);
+    
+    // Filter only current and previous month
+    const filterCurrentMonth = new Date().getMonth() + 1;
+    const filterPrevMonth = filterCurrentMonth === 1 ? 12 : filterCurrentMonth - 1;
+    const monthsToShow = [filterCurrentMonth, filterPrevMonth];
+    
+    const filteredWeeks = weeks.filter(week => {
+        const dateMatch = week.period.match(/(\d{2})\.(\d{2})/);
+        if (dateMatch) {
+            const month = parseInt(dateMatch[2]);
+            return monthsToShow.includes(month);
+        }
+        return false;
+    });
+    
+    // Sort weeks by date (newest first)
+    const parseWeekDateForSort = (dateStr) => {
+        // Match: DD.MM-DD.MM.YY or DD.MM-DD.MM
+        const yearMatch = dateStr.match(/\.(\d{2})$/);
+        const year = yearMatch ? '20' + yearMatch[1] : '2025';
+        const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})/);
+        if (parts) {
+            const [, d1, m1, d2, m2] = parts;
+            return new Date(year, parseInt(m2) - 1, parseInt(d2));
+        }
+        return new Date(0);
+    };
+    
+    filteredWeeks.sort((a, b) => parseWeekDateForSort(b.period) - parseWeekDateForSort(a.period));
+    
+    return { weeks: filteredWeeks, stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
 };
 
 const updateStats = (task, stats) => {
@@ -1428,45 +1640,6 @@ const parseTaskRow = (row, format) => {
     }
 };
 
-const renderDepartmentData = (department) => {
-    const data = departmentsData[department] || { weeks: [], stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
-    
-    // Render table with weeks
-    const container = document.getElementById('departmentTableBody');
-    if (!data.weeks || data.weeks.length === 0) {
-        container.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-400">Нет данных</td></tr>';
-        return;
-    }
-    
-    const html = data.weeks.map((week, weekIndex) => {
-        const weekCompleted = week.tasks.filter(t => (t.status || '').toLowerCase().includes('выполн')).length;
-        const weekTotal = week.tasks.length;
-
-        return `
-            <tr class="bg-slate-100">
-                <td colspan="5" class="px-3 py-2">
-                    <div class="flex justify-between items-center">
-                        <span class="font-bold text-slate-800">${week.name}</span>
-                        <span class="text-xs text-slate-500">${weekCompleted}/${weekTotal}</span>
-                    </div>
-                </td>
-            </tr>
-            ${week.tasks.map(task => `
-                <tr class="hover:bg-slate-100 border-b border-slate-100">
-                    <td class="px-3 py-2 text-slate-700 font-medium w-12">${task.id}</td>
-                    <td class="px-3 py-2 text-slate-900 font-medium break-words flex-1">${task.task}</td>
-                    <td class="px-3 py-2 text-slate-600 text-xs w-1/4">${task.product || '-'}</td>
-                    <td class="px-3 py-1.5 text-slate-500 text-xs w-1/5">${task.comment || '-'}</td>
-                    <td class="px-3 py-1.5 w-20">
-                        <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
-                    </td>
-                </tr>
-              `).join('')}
-        `;
-    }).join('');
-
-    container.innerHTML = html;
-};
 
 window.importFromSheets = async () => {
     const url = document.getElementById('sheetsUrl').value;
@@ -1514,11 +1687,16 @@ window.syncFromSheets = async () => {
 
 const renderSheetsTable = (rows) => {
     const tbody = document.getElementById('sheetsTableBody');
+    if (!tbody) {
+        console.error('Элемент с ID "sheetsTableBody" не найден в DOM');
+        return;
+    }
+    
     if (!rows || rows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-400">Нет данных</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = rows.map(row => `
         <tr class="hover:bg-slate-50 border-b border-slate-100">
             <td class="px-3 py-2 text-slate-700">${row.date || '-'}</td>
@@ -1540,6 +1718,78 @@ const getStatusClass = (status) => {
     return 'bg-gray-100 text-gray-600 border-gray-200';
 };
 
+const parseRSOData = (rows) => {
+    const weeks = [];
+    let currentBlock = null;
+    
+    const weekRegex = /\d{2}\.\d{2}-\d{2}\.\d{2}(\.\d{2})?/;
+    
+    rows.forEach((row) => {
+        const rowText = row.join(' | ');
+        
+        // Check for week date
+        for (let i = 0; i < row.length; i++) {
+            if (weekRegex.test(row[i])) {
+                if (currentBlock) weeks.push(currentBlock);
+                currentBlock = {
+                    period: row[i],
+                    tasks: [],
+                    stats: { completed: 0, total: 0, percent: '0%' }
+                };
+                break;
+            }
+        }
+        
+        if (!currentBlock) return;
+        
+        // Skip header rows
+        if (row[0] === '№' || row[1]?.includes('ЗАДАЧИ')) return;
+        if (row[0] === 'ПОКАЗАТЕЛИ') return;
+        if (row[0] === 'Неделя') return;
+        
+        // Check for task row (starts with number)
+        if (row[0] && /^\d+$/.test(row[0])) {
+            const task = {
+                id: parseInt(row[0]),
+                task: row[1] || '',
+                product: row[2] || '',
+                status: row[3] || 'Без статуса',
+                comment: row[4] || ''
+            };
+            if (task.task && task.task !== 'незапланированные задачи') {
+                currentBlock.tasks.push(task);
+            }
+        }
+        
+        // Stats row - format: "Выполнено задач в неделю: | | 0 | из | 14"
+        if (rowText.includes('из') && !isNaN(parseInt(row[2]))) {
+            currentBlock.stats.completed = parseInt(row[2]);
+            for (let i = 0; i < row.length; i++) {
+                if (row[i] === 'из' && row[i+1]) {
+                    currentBlock.stats.total = parseInt(row[i+1]);
+                    break;
+                }
+            }
+        }
+    });
+    
+    if (currentBlock) weeks.push(currentBlock);
+    
+    // Sort by date (newest first)
+    const parseWeekDate = (dateStr) => {
+        const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})/);
+        if (parts) {
+            const [, d1, m1, d2, m2] = parts;
+            return new Date('20' + (parts[4] || '25'), parseInt(m2) - 1, parseInt(d2));
+        }
+        return new Date(0);
+    };
+    
+    weeks.sort((a, b) => parseWeekDate(b.period) - parseWeekDate(a.period));
+    
+    return { weeks, stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
+};
+
 // --- INIT ---
 const init = async () => {
     if (!checkAuth()) return;
@@ -1549,6 +1799,37 @@ const init = async () => {
     checkDeadline();
     await loadAllDepartments();
     render();
+
+    // Скрываем спиннер загрузки и показываем основной контент
+    const spinner = document.getElementById('loading-spinner');
+    const app = document.getElementById('app');
+
+    if (spinner) {
+        spinner.style.display = 'none';
+    }
+
+    if (app) {
+        app.classList.remove('hidden');
+    }
+};
+
+// --- LOADING INDICATORS ---
+const showLoadingIndicator = (elementId) => {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.innerHTML = `
+            <div class="flex items-center justify-center p-8" role="status" aria-live="polite">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mr-3"></div>
+                <span>Загрузка...</span>
+            </div>`;
+    }
+};
+
+const hideLoadingIndicator = (elementId) => {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.innerHTML = '';
+    }
 };
 
 document.addEventListener('DOMContentLoaded', init);
