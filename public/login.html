@@ -2,47 +2,75 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход - Weekly Report</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Manrope', 'sans-serif'] },
+            boxShadow: {
+              'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
+              'soft-lg': '0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 2px 10px -2px rgba(0, 0, 0, 0.04)',
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-out',
+            },
+            keyframes: {
+              fadeIn: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            }
+          }
+        }
+      }
+    </script>
     <style>
         * { font-family: 'Manrope', sans-serif; }
+        body { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
+        .input-field { transition: all 0.2s ease; }
+        .input-field:focus { transform: translateY(-1px); }
     </style>
 </head>
-<body class="bg-slate-900 min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 to-slate-100">
     <div class="w-full max-w-md">
-        <div class="bg-white rounded-2xl shadow-2xl p-8">
+        <div class="bg-white rounded-2xl shadow-soft-lg p-8 animate-fade-in">
             <div class="text-center mb-8">
-                <i data-lucide="lock" class="w-16 h-16 text-green-600 mx-auto mb-4"></i>
-                <h1 class="text-2xl font-bold text-slate-900">Вход в систему</h1>
+                <div class="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="lock" class="w-8 h-8 text-green-600"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900">Добро пожаловать</h1>
                 <p class="text-slate-500 mt-2">Weekly Report Generator</p>
             </div>
 
-            <form id="loginForm" class="space-y-4">
+            <form id="loginForm" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-bold text-slate-700 mb-2">Логин</label>
-                    <input type="text" id="login" required
-                        class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-green-500 text-lg"
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Логин</label>
+                    <input type="text" id="login" required autocomplete="username"
+                        class="input-field w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-lg transition-all"
                         placeholder="Введите логин">
                 </div>
 
                 <div>
-                    <label class="block text-sm font-bold text-slate-700 mb-2">Пароль</label>
-                    <input type="password" id="password" required
-                        class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-green-500 text-lg"
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Пароль</label>
+                    <input type="password" id="password" required autocomplete="current-password"
+                        class="input-field w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-lg transition-all"
                         placeholder="Введите пароль">
                 </div>
 
-                <div id="errorMsg" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm"></div>
+                <div id="errorMsg" class="hidden bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm"></div>
 
                 <button type="submit"
-                    class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold uppercase tracking-wider rounded-lg transition-colors">
+                    class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold rounded-xl transition-all duration-200 shadow-soft hover:shadow-lg transform active:scale-[0.98]">
                     Войти
                 </button>
             </form>
 
-            <div class="mt-6 text-center text-xs text-slate-400">
-                Weekly Report Express v1.0
+            <div class="mt-8 text-center">
+                <div class="h-px bg-slate-100 mb-4"></div>
+                <p class="text-xs text-slate-400">Weekly Report Express v1.0</p>
             </div>
         </div>
     </div>

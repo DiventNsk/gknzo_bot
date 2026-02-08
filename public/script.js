@@ -16,14 +16,16 @@ window.logout = () => {
 
 // Switch Korsovet/Plan Dnya mode
 window.switchKorsovetMode = (mode) => {
+    const previousMode = state.korsovetMode;
     state.korsovetMode = mode;
-    
-    // Если выбран режим "План дня руководителя", загружаем соответствующие данные
+
     if (mode === 'plan_dnya') {
         loadDirectorPlanData();
+    } else if (previousMode === 'plan_dnya') {
+        loadAllDepartments();
+    } else {
+        render();
     }
-    
-    render();
 };
 
 // Функция для загрузки данных из таблицы "План дня руководителя"
@@ -154,62 +156,53 @@ const renderGoogleSheetsDashboard = () => {
     const defaultSheetNames = ['НП', 'ГИ', 'КД', 'РОМ', 'РОПР', 'РСО'];
     
     return `
-    <div class="animate-fade-in">
-        <div class="flex flex-col items-center mb-6 pb-4 border-b-2 border-green-600">
-            <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-3" role="banner">
-                <div class="p-2 bg-green-600 rounded-lg">
-                    <i data-lucide="${state.korsovetMode === 'korsovet' ? 'layout-dashboard' : 'calendar-days'}" class="w-6 h-6 text-white" aria-hidden="true"></i>
-                </div>
-                <span>${state.korsovetMode === 'korsovet' ? 'Корсовет' : 'План дня руководителя'}</span>
-            </h1>
-            <div class="flex justify-between items-center w-full mt-3">
-                <p class="text-sm text-slate-600 font-medium">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                <button
-                    onclick="loadAllDepartments()"
-                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 shadow-md transition-all hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-green-300"
-                    aria-label="Обновить данные о всех отделах"
-                    tabindex="0">
-                    <i data-lucide="refresh-cw" class="w-5 h-5" aria-hidden="true"></i>
-                    <span class="hidden sm:inline">Обновить</span>
-                </button>
+    <div class="animate-fade-in-up">
+        <div class="flex flex-row justify-between items-center mb-4 pb-3 border-b border-slate-200">
+            <div class="flex flex-col">
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight" role="banner">${state.korsovetMode === 'korsovet' ? 'Корсовет' : 'План дня'}</h1>
+                <p class="text-sm text-slate-500">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
+            <button
+                onclick="loadAllDepartments()"
+                class="px-4 py-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-xl flex items-center gap-2 transition-all duration-200 shadow-soft hover:shadow-lg transform active:scale-[0.98]"
+                aria-label="Обновить данные"
+                tabindex="0">
+                <i data-lucide="refresh-cw" class="w-4 h-4" aria-hidden="true"></i>
+                <span class="hidden sm:inline">Обновить</span>
+            </button>
         </div>
 
-        <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden mb-4" role="region" aria-labelledby="mode-selector">
-            <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-center">
-                <div class="flex gap-1" id="mode-selector">
+        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden mb-4" role="region" aria-labelledby="mode-selector">
+            <div class="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-center">
+                <div class="flex gap-1 p-1 bg-slate-100 rounded-lg" id="mode-selector">
                     <button 
                         onclick="switchKorsovetMode('korsovet')" 
-                        class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-green-300 ${state.korsovetMode === 'korsovet' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}" 
+                        class="px-5 py-2 text-sm font-medium rounded-md transition-all ${state.korsovetMode === 'korsovet' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}" 
                         aria-pressed="${state.korsovetMode === 'korsovet'}"
                         tabindex="0">
                         Корсовет
                     </button>
                     <button 
                         onclick="switchKorsovetMode('plan_dnya')" 
-                        class="px-6 py-2 text-sm font-bold uppercase rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-green-300 ${state.korsovetMode === 'plan_dnya' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}" 
+                        class="px-5 py-2 text-sm font-medium rounded-md transition-all ${state.korsovetMode === 'plan_dnya' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}" 
                         aria-pressed="${state.korsovetMode === 'plan_dnya'}"
                         tabindex="0">
-                        План дня руководителя
+                        План дня
                     </button>
                 </div>
             </div>
 
-            <div class="bg-slate-50 px-4 py-2 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2">
-                <h2 class="hidden font-bold text-slate-800 flex items-center gap-2">
-                    <i data-lucide="users" class="w-4 h-4 text-green-600"></i>
-                    Отделы
-                </h2>
-                <span class="hidden text-xs text-slate-500">${Object.keys(departmentsData).length} из ${defaultSheetNames.length} загружено</span>
+            <div class="px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-2">
+                <span class="text-xs text-slate-500">${Object.keys(departmentsData).length} из ${defaultSheetNames.length} загружено</span>
             </div>
-            <div class="p-2">
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1" id="departmentGrid">
+            <div class="p-3">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2" id="departmentGrid">
                     ${defaultSheetNames.map(sheet => {
                         const deptData = departmentsData[sheet] || { stats: { total: 0 } };
                         return `
-                            <button onclick="switchDepartment('${sheet}')" class="department-btn p-2 rounded-lg border-2 border-slate-200 hover:border-green-500 hover:bg-green-50 transition-all text-center ${currentDepartment === sheet ? 'border-green-600 bg-green-50' : ''}" data-dept="${sheet}">
-                                <div class="font-bold text-sm text-slate-900">${sheet}</div>
-                                <div class="text-xs text-slate-500">${deptData.stats?.total || 0} задач</div>
+                            <button onclick="switchDepartment('${sheet}')" class="department-btn p-3 rounded-xl border-2 border-slate-100 hover:border-green-400 hover:bg-green-50/50 transition-all text-center ${currentDepartment === sheet ? 'border-green-500 bg-green-50' : ''}" data-dept="${sheet}">
+                                <div class="font-semibold text-slate-900">${sheet}</div>
+                                <div class="text-xs text-slate-500 mt-0.5">${deptData.stats?.total || 0}</div>
                             </button>
                         `;
                     }).join('')}
@@ -219,7 +212,7 @@ const renderGoogleSheetsDashboard = () => {
             <div class="overflow-x-auto custom-scrollbar">
                 ${state.korsovetMode === 'plan_dnya' ? `
                     <div class="mb-4">
-                        <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg text-sm font-bold bg-white focus:outline-none focus:border-green-500 cursor-pointer">
+                        <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 cursor-pointer shadow-soft">
                             <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
                             <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
                             <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
@@ -247,27 +240,27 @@ const renderAllDepartmentsTasks = () => {
 
             if (filteredTasks.length > 0) {
                 allTasksHtml += `
-                    <div class="mb-6">
-                        <h3 class="text-lg font-bold text-slate-800 mb-3 px-2 py-1 bg-slate-100 rounded">${deptName}</h3>
-                        <div class="space-y-3 p-3">
+                    <div class="mb-4">
+                        <h3 class="text-base font-semibold text-slate-800 mb-3 px-3 py-1.5 bg-slate-50 rounded-lg inline-block">${deptName}</h3>
+                        <div class="space-y-3">
                             ${filteredTasks.map(task => `
-                                <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200" role="listitem" tabindex="0">
-                                    <div class="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                                        <span class="font-bold text-slate-800 text-base" aria-label="Номер задачи">#${task.id || 'N/A'}</span>
-                                        <span class="px-2.5 py-1 rounded text-xs font-bold border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
+                                <div class="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-soft hover:shadow-soft-lg transition-all duration-200 card-hover" role="listitem" tabindex="0">
+                                    <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100">
+                                        <span class="font-semibold text-slate-700" aria-label="Номер задачи">#${task.id || 'N/A'}</span>
+                                        <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
                                     </div>
-                                    <div class="p-4 space-y-2.5">
-                                        <div class="text-slate-900 font-medium text-base leading-relaxed" aria-label="Описание задачи">${task.task || ''}</div>
+                                    <div class="p-4 space-y-2">
+                                        <div class="text-slate-900 font-medium leading-relaxed" aria-label="Описание задачи">${task.task || ''}</div>
                                         ${task.product ? `
                                             <div class="flex items-start gap-2 text-sm">
-                                                <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Продукт">📦 Продукт:</span>
-                                                <span class="text-slate-700">${task.product}</span>
+                                                <span class="text-slate-500 flex-shrink-0" aria-label="Продукт">📦</span>
+                                                <span class="text-slate-600">${task.product}</span>
                                             </div>
                                         ` : ''}
                                         ${task.comment ? `
                                             <div class="flex items-start gap-2 text-sm">
-                                                <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Комментарий">💬 Комментарий:</span>
-                                                <span class="text-slate-700">${task.comment}</span>
+                                                <span class="text-slate-500 flex-shrink-0" aria-label="Комментарий">💬</span>
+                                                <span class="text-slate-600">${task.comment}</span>
                                             </div>
                                         ` : ''}
                                     </div>
@@ -330,7 +323,7 @@ const renderDepartmentTasks = (department) => {
     
     return `
         <div class="mb-4">
-            <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg text-sm font-bold bg-white focus:outline-none focus:border-green-500 cursor-pointer">
+            <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 cursor-pointer shadow-soft">
                 <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
                 <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
                 <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
@@ -346,35 +339,34 @@ const renderDepartmentTasks = (department) => {
             const weekPercent = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
         
         return `
-            <div class="border-b border-slate-200 last:border-0">
-                <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-600 shadow-sm">
-                    <span class="font-bold text-green-900 text-base">${week.name}</span>
+            <div class="border-b border-slate-100 last:border-0 mb-4">
+                <div class="bg-white px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-500 shadow-soft rounded-r-xl">
+                    <span class="font-semibold text-slate-800">${week.name}</span>
                     <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-green-700">${weekCompleted}/${weekTotal}</span>
-                        <span class="px-3 py-1 font-bold text-white rounded ${weekPercent >= 70 ? 'bg-green-600' : weekPercent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${weekPercent}%</span>
+                        <span class="text-sm text-slate-500">${weekCompleted}/${weekTotal}</span>
+                        <span class="px-3 py-1 font-semibold text-white rounded-full ${weekPercent >= 70 ? 'bg-green-500' : weekPercent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${weekPercent}%</span>
                     </div>
                 </div>
 
-                <!-- Task Cards (enhanced visual hierarchy and accessibility) -->
-                <div class="space-y-4 p-3" role="list" aria-label="Список задач">
+                <div class="space-y-3 p-3" role="list" aria-label="Список задач">
                     ${filteredTasks.map(task => `
-                        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200" role="listitem" tabindex="0">
-                            <div class="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                                <span class="font-bold text-slate-800 text-base" aria-label="Номер задачи">#${task.id}</span>
-                                <span class="px-2.5 py-1 rounded text-xs font-bold border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
+                        <div class="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-soft hover:shadow-soft-lg transition-all duration-200 card-hover" role="listitem" tabindex="0">
+                            <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100">
+                                <span class="font-semibold text-slate-700" aria-label="Номер задачи">#${task.id}</span>
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
                             </div>
-                            <div class="p-4 space-y-2.5">
-                                <div class="text-slate-900 font-medium text-base leading-relaxed" aria-label="Описание задачи">${task.task}</div>
+                            <div class="p-4 space-y-2">
+                                <div class="text-slate-900 font-medium leading-relaxed" aria-label="Описание задачи">${task.task}</div>
                                 ${task.product ? `
                                     <div class="flex items-start gap-2 text-sm">
-                                        <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Продукт">📦 Продукт:</span>
-                                        <span class="text-slate-700">${task.product}</span>
+                                        <span class="text-slate-500 flex-shrink-0" aria-label="Продукт">📦</span>
+                                        <span class="text-slate-600">${task.product}</span>
                                     </div>
                                 ` : ''}
                                 ${task.comment ? `
                                     <div class="flex items-start gap-2 text-sm">
-                                        <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Комментарий">💬 Комментарий:</span>
-                                        <span class="text-slate-700">${task.comment}</span>
+                                        <span class="text-slate-500 flex-shrink-0" aria-label="Комментарий">💬</span>
+                                        <span class="text-slate-600">${task.comment}</span>
                                     </div>
                                 ` : ''}
                             </div>
@@ -579,15 +571,18 @@ const render = () => {
     content += `<div id="banner"></div>`;
 
     content += `
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-slate-900 z-50 flex justify-around p-0 md:hidden safe-area-pb">
-        <button onclick="navigate('sheets')" class="flex flex-col items-center justify-center p-3 w-full font-bold uppercase tracking-wider text-[10px] ${state.view === 'sheets' ? 'bg-green-600 text-white' : 'bg-white text-slate-500'} touch-manipulation">
-            <i data-lucide="table" class="mb-1 w-5 h-5"></i> Отчеты
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 flex justify-around py-1 md:hidden safe-area-pb shadow-soft-lg">
+        <button onclick="navigate('sheets')" class="flex flex-col items-center justify-center p-3 w-full font-medium text-xs ${state.view === 'sheets' ? 'text-green-600' : 'text-slate-400 hover:text-slate-600'} touch-manipulation transition-colors">
+            <i data-lucide="table" class="mb-1 w-5 h-5"></i>
+            Отчеты
         </button>
-        <button onclick="navigate('create')" class="flex flex-col items-center justify-center p-3 w-full font-bold uppercase tracking-wider text-[10px] ${state.view === 'create' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'} touch-manipulation">
-            <i data-lucide="file-edit" class="mb-1 w-5 h-5"></i> Заполнить
+        <button onclick="navigate('create')" class="flex flex-col items-center justify-center p-3 w-full font-medium text-xs ${state.view === 'create' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'} touch-manipulation transition-colors">
+            <i data-lucide="file-edit" class="mb-1 w-5 h-5"></i>
+            Заполнить
         </button>
-        <button onclick="selectDirectorView()" class="flex flex-col items-center justify-center p-3 w-full font-bold uppercase tracking-wider text-[10px] ${state.view === 'director' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'} touch-manipulation">
-            <i data-lucide="eye" class="mb-1 w-5 h-5"></i> Директор
+        <button onclick="selectDirectorView()" class="flex flex-col items-center justify-center p-3 w-full font-medium text-xs ${state.view === 'director' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'} touch-manipulation transition-colors">
+            <i data-lucide="eye" class="mb-1 w-5 h-5"></i>
+            Директор
         </button>
     </div>`;
 
@@ -609,16 +604,16 @@ const render = () => {
 
 const renderKpiRow = (key, title, icon, color) => {
     return `
-    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-start sm:items-center p-3 sm:p-4 border-b last:border-0 border-slate-200 hover:bg-slate-50">
-        <div class="sm:col-span-4 flex items-center gap-2 sm:gap-3 font-bold text-slate-700 mb-2 sm:mb-0">
-            <div class="p-1.5 sm:p-2 shrink-0 border bg-${color}-100 text-${color}-700 border-${color}-200"><i data-lucide="${icon}" class="w-4 h-4 sm:w-5 sm:h-5"></i></div>
-            <span class="text-sm sm:text-base uppercase tracking-tight truncate">${title}</span>
+    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start sm:items-center p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors rounded-xl">
+        <div class="sm:col-span-4 flex items-center gap-3 font-medium text-slate-700">
+            <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg"><i data-lucide="${icon}" class="w-4 h-4 sm:w-5 sm:h-5 text-slate-500"></i></div>
+            <span class="text-sm uppercase tracking-tight truncate">${title}</span>
         </div>
         <div class="sm:col-span-3 w-full">
-            <input type="number" value="${state.kpis[key].quantity}" oninput="updateKpi('${key}', 'quantity', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-2 sm:px-3 py-2.5 sm:py-2 bg-white text-slate-900 text-sm sm:text-base border-2 border-slate-300 focus:outline-none focus:border-blue-600 font-mono text-center h-10 sm:h-[42px] touch-manipulation" placeholder="0">
+            <input type="number" value="${state.kpis[key].quantity}" oninput="updateKpi('${key}', 'quantity', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-3 py-2.5 bg-white text-slate-900 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono text-center h-10 sm:h-11 touch-manipulation shadow-soft" placeholder="0">
         </div>
         <div class="sm:col-span-5 w-full">
-            <textarea rows="1" oninput="updateKpi('${key}', 'description', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-2 sm:px-3 py-2 bg-white text-slate-900 text-sm sm:text-base border-2 border-slate-300 focus:outline-none focus:border-blue-600 resize-none overflow-hidden min-h-10 sm:min-h-[42px] leading-normal touch-manipulation" placeholder="Описание">${state.kpis[key].description}</textarea>
+            <textarea rows="1" oninput="updateKpi('${key}', 'description', this.value)" ${state.isLocked ? 'disabled' : ''} class="w-full px-3 py-2 bg-white text-slate-900 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none overflow-hidden min-h-10 sm:min-h-11 leading-normal touch-manipulation shadow-soft" placeholder="Описание">${state.kpis[key].description}</textarea>
         </div>
     </div>`;
 };
@@ -659,39 +654,40 @@ const renderKdDoubleIndicatorRow = (key, title, icon, color) => {
 const renderTaskRow = (task, index) => {
     const status = STATUS_OPTIONS.find(s => s.value === task.status) || STATUS_OPTIONS[3];
     return `
-    <div class="border-2 border-slate-300 p-3 relative group bg-white hover:border-slate-400 touch-manipulation">
+    <div class="border border-slate-100 p-4 relative group bg-white hover:border-slate-200 touch-manipulation rounded-xl shadow-soft">
         <div class="flex justify-end items-center mb-2 sm:hidden">
-            <button onclick="removeTask('${task.id}')" class="p-2 text-slate-400 hover:text-red-600 touch-manipulation"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+            <button onclick="removeTask('${task.id}')" class="p-2 text-slate-400 hover:text-red-500 touch-manipulation"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
             <div class="sm:col-span-5">
-                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Задача</label>
-                <textarea rows="1" oninput="updateTask('${task.id}', 'task_text', this.value)" class="w-full px-3 py-2.5 bg-slate-50 text-slate-900 text-sm border-2 border-slate-200 focus:bg-white focus:outline-none focus:border-indigo-600 resize-none overflow-hidden min-h-10" placeholder="Суть задачи">${task.task_text}</textarea>
+                <label class="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 block">Задача</label>
+                <textarea rows="1" oninput="updateTask('${task.id}', 'task_text', this.value)" class="w-full px-3 py-2.5 bg-slate-50 text-slate-900 text-sm border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none overflow-hidden min-h-10" placeholder="Суть задачи">${task.task_text}</textarea>
             </div>
             <div class="sm:col-span-4">
-                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Результат</label>
-                <textarea rows="1" oninput="updateTask('${task.id}', 'product', this.value)" class="w-full px-3 py-2.5 bg-slate-50 text-slate-900 text-sm border-2 border-slate-200 focus:bg-white focus:outline-none focus:border-indigo-600 resize-none overflow-hidden min-h-10" placeholder="Ожидаемый итог">${task.product}</textarea>
+                <label class="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 block">Результат</label>
+                <textarea rows="1" oninput="updateTask('${task.id}', 'product', this.value)" class="w-full px-3 py-2.5 bg-slate-50 text-slate-900 text-sm border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 resize-none overflow-hidden min-h-10" placeholder="Ожидаемый итог">${task.product}</textarea>
             </div>
             <div class="sm:col-span-3">
-                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Статус</label>
+                <label class="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 block">Статус</label>
                 <div class="relative">
-                    <select onchange="updateTask('${task.id}', 'status', this.value)" class="w-full px-3 py-2.5 h-10 border-2 appearance-none text-sm font-bold focus:outline-none ${status.color} touch-manipulation">
+                    <select onchange="updateTask('${task.id}', 'status', this.value)" class="w-full px-3 py-2.5 h-10 appearance-none text-sm font-medium rounded-lg border border-slate-200 focus:outline-none ${status.color} touch-manipulation bg-white">
                         ${STATUS_OPTIONS.map(opt => `<option value="${opt.value}" class="bg-white text-slate-900" ${task.status === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('')}
                     </select>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 </div>
             </div>
             <div class="hidden sm:flex sm:col-span-12 items-center justify-between gap-3 pt-2 border-t border-slate-100 mt-2">
-                <label class="flex items-center gap-2 text-[10px] font-bold text-amber-600 uppercase tracking-widest">
-                    <input type="checkbox" onchange="toggleTaskFocus('${task.id}')" ${task.focus ? 'checked' : ''} class="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 touch-manipulation">
+                <label class="flex items-center gap-2 text-[10px] font-medium text-amber-600 uppercase tracking-wider">
+                    <input type="checkbox" onchange="toggleTaskFocus('${task.id}')" ${task.focus ? 'checked' : ''} class="w-4 h-4 text-amber-500 rounded focus:ring-amber-500 touch-manipulation">
                     В фокусе
                 </label>
-                <button onclick="removeTask('${task.id}')" class="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 h-10 flex items-center justify-center touch-manipulation"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                <button onclick="removeTask('${task.id}')" class="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 h-10 flex items-center justify-center touch-manipulation rounded-lg transition-colors"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
             </div>
         </div>
         <div class="mt-3 pt-2 border-t border-slate-100">
              <div class="flex items-center gap-2">
-                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">Комментарий:</label>
-                 <textarea rows="1" oninput="updateTask('${task.id}', 'comment', this.value)" class="w-full px-2 py-1.5 text-sm text-slate-700 italic bg-transparent border-b border-slate-200 hover:border-slate-400 focus:border-indigo-600 focus:outline-none resize-none overflow-hidden min-h-[30px]" placeholder="Примечания...">${task.comment}</textarea>
+                 <label class="text-[10px] font-medium text-slate-400 uppercase tracking-wider shrink-0">Комментарий:</label>
+                 <textarea rows="1" oninput="updateTask('${task.id}', 'comment', this.value)" class="w-full px-2 py-1.5 text-sm text-slate-600 italic bg-transparent border-b border-slate-200 hover:border-slate-300 focus:border-green-500 focus:outline-none resize-none overflow-hidden min-h-[30px]" placeholder="Примечания...">${task.comment}</textarea>
              </div>
         </div>
     </div>`;
@@ -700,25 +696,26 @@ const renderTaskRow = (task, index) => {
 const renderUnplannedRow = (task) => {
     const status = STATUS_OPTIONS.find(s => s.value === task.status) || STATUS_OPTIONS[3];
     return `
-    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start bg-white p-3 sm:p-4 border border-amber-300 shadow-sm">
+    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start bg-white p-4 border border-amber-100 shadow-sm rounded-xl">
         <div class="sm:col-span-5 w-full">
-           <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block sm:hidden">Задача</label>
-           <textarea rows="1" oninput="updateUnplanned('${task.id}', 'task_text', this.value)" class="w-full px-3 py-2.5 bg-transparent text-slate-900 text-sm border-2 border-slate-200 focus:border-amber-500 focus:outline-none resize-none overflow-hidden min-h-10" placeholder="Что прилетело?">${task.task_text}</textarea>
+           <label class="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 block sm:hidden">Задача</label>
+           <textarea rows="1" oninput="updateUnplanned('${task.id}', 'task_text', this.value)" class="w-full px-3 py-2.5 bg-white text-slate-900 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 resize-none overflow-hidden min-h-10" placeholder="Что прилетело?">${task.task_text}</textarea>
         </div>
         <div class="sm:col-span-4 w-full">
-          <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block sm:hidden">Результат</label>
-          <textarea rows="1" oninput="updateUnplanned('${task.id}', 'product', this.value)" class="w-full px-3 py-2.5 bg-transparent text-slate-900 text-sm border-2 border-slate-200 focus:border-amber-500 focus:outline-none resize-none overflow-hidden min-h-10" placeholder="Результат">${task.product}</textarea>
+          <label class="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 block sm:hidden">Результат</label>
+          <textarea rows="1" oninput="updateUnplanned('${task.id}', 'product', this.value)" class="w-full px-3 py-2.5 bg-white text-slate-900 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 resize-none overflow-hidden min-h-10" placeholder="Результат">${task.product}</textarea>
         </div>
         <div class="sm:col-span-3 flex flex-col gap-2">
-          <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0 sm:hidden">Статус</label>
+          <label class="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-0 sm:hidden">Статус</label>
           <div class="relative flex gap-2">
-              <select onchange="updateUnplanned('${task.id}', 'status', this.value)" class="flex-1 appearance-none text-sm border-2 border-slate-200 px-3 py-2.5 focus:outline-none focus:border-amber-500 font-bold h-10 ${status.color} touch-manipulation">
+              <select onchange="updateUnplanned('${task.id}', 'status', this.value)" class="flex-1 appearance-none text-sm border border-slate-200 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-medium h-10 rounded-lg ${status.color} touch-manipulation bg-white">
                 ${STATUS_OPTIONS.filter(o => o.value !== 'Без статуса').map(opt => `<option value="${opt.value}" class="bg-white text-slate-900" ${task.status === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('')}
               </select>
-              <button onclick="removeUnplanned('${task.id}')" class="px-3 py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 h-10 flex items-center justify-center touch-manipulation"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-12 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <button onclick="removeUnplanned('${task.id}')" class="px-3 py-2 text-slate-400 hover:text-red-500 hover:bg-red-50 border border-slate-200 h-10 flex items-center justify-center touch-manipulation rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
           </div>
-          <label class="flex items-center gap-1 text-[10px] font-bold text-amber-600 uppercase tracking-widest">
-              <input type="checkbox" onchange="toggleUnplannedFocus('${task.id}')" ${task.focus ? 'checked' : ''} class="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 touch-manipulation">
+          <label class="flex items-center gap-1.5 text-[10px] font-medium text-amber-600 uppercase tracking-wider">
+              <input type="checkbox" onchange="toggleUnplannedFocus('${task.id}')" ${task.focus ? 'checked' : ''} class="w-4 h-4 text-amber-500 rounded focus:ring-amber-500 touch-manipulation">
               В фокусе
           </label>
         </div>
@@ -733,36 +730,36 @@ const renderReportItemCompact = (report) => {
     const typeLabel = report.report_type === 'monthly' ? 'МЕС' : 'НЕД';
     
     return `
-    <div class="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow rounded-lg overflow-hidden">
-        <div onclick="var el=document.getElementById('${domId}'); if(el) el.classList.toggle('hidden'); if(typeof lucide!=='undefined')lucide.createIcons();" class="p-3 cursor-pointer bg-white hover:bg-slate-50">
+    <div class="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-soft hover:shadow-soft-lg transition-all duration-200 card-hover">
+        <div onclick="var el=document.getElementById('${domId}'); if(el) el.classList.toggle('hidden'); if(typeof lucide!=='undefined')lucide.createIcons();" class="p-4 cursor-pointer">
             <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                    <div class="p-2 bg-slate-100 border border-slate-200 rounded shrink-0">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg">
                         <i data-lucide="file-text" class="w-4 h-4 text-slate-500"></i>
                     </div>
                     <div class="min-w-0">
                         <div class="flex items-center gap-1.5 mb-0.5">
-                            <span class="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 truncate max-w-[70px]">${report.department}</span>
-                            <span class="text-[10px] px-2 py-0.5 ${report.report_type === 'monthly' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-800 text-white'} rounded font-bold">${typeLabel}</span>
+                            <span class="text-xs font-medium text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 truncate max-w-[70px]">${report.department}</span>
+                            <span class="text-[10px] px-2 py-0.5 ${report.report_type === 'monthly' ? 'bg-slate-100 text-slate-700' : 'bg-slate-800 text-white'} rounded font-medium">${typeLabel}</span>
                         </div>
-                        <div class="text-xs text-slate-500 font-mono">${report.period?.week_dates || '—'}</div>
+                        <div class="text-xs text-slate-400">${report.period?.week_dates || '—'}</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                     <div class="text-right">
-                        <div class="text-xl font-bold ${percentClass}">${percent}%</div>
+                        <div class="text-xl font-semibold ${percentClass}">${percent}%</div>
                         <div class="text-[9px] text-slate-400">${report.calculated_stats?.done || 0}/${report.calculated_stats?.total || 0}</div>
                     </div>
                 </div>
             </div>
-            <div class="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div class="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div class="h-full ${percentBg} transition-all" style="width: ${percent}%"></div>
             </div>
         </div>
-        <div id="${domId}" class="hidden border-t border-slate-100 bg-slate-50 p-3 space-y-3">
+        <div id="${domId}" class="hidden border-t border-slate-100 bg-slate-50/50 p-4 space-y-3">
             ${report.tasks && report.tasks.length > 0 ? `
             <div>
-                <div class="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                <div class="text-xs font-medium text-slate-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                     <i data-lucide="list-todo" class="w-3 h-3"></i> Задачи (${report.tasks.length})
                 </div>
                 <div class="space-y-1">
@@ -773,7 +770,7 @@ const renderReportItemCompact = (report) => {
                             <div class="text-slate-700 truncate">${t.task_text || '—'}</div>
                             ${t.product ? `<div class="text-slate-400 text-[10px] truncate">→ ${t.product}</div>` : ''}
                         </div>
-                        <span class="text-[9px] px-1.5 py-0.5 rounded border ${t.status === 'Выполнено' ? 'bg-green-50 text-green-600 border-green-200' : (t.status === 'Не выполнено' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200')}">${t.status}</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded border ${t.status === 'Выполнено' ? 'bg-green-50 text-green-600 border-green-100' : (t.status === 'Не выполнено' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-blue-50 text-blue-600 border-blue-100')}">${t.status}</span>
                     </div>
                     `).join('')}
                     ${report.tasks.length > 5 ? `<div class="text-xs text-slate-400 text-center py-1">...ещё ${report.tasks.length - 5}</div>` : ''}
@@ -783,7 +780,7 @@ const renderReportItemCompact = (report) => {
             
             ${report.unplanned_tasks && report.unplanned_tasks.length > 0 ? `
             <div>
-                <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                <div class="text-xs font-medium text-amber-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                     <i data-lucide="alert-triangle" class="w-3 h-3"></i> Вне плана (${report.unplanned_tasks.length})
                 </div>
                 <div class="space-y-1">
@@ -794,7 +791,7 @@ const renderReportItemCompact = (report) => {
                             <div class="text-slate-700 truncate">${t.task_text || '—'}</div>
                             ${t.product ? `<div class="text-slate-400 text-[10px] truncate">→ ${t.product}</div>` : ''}
                         </div>
-                        <span class="text-[9px] px-1.5 py-0.5 rounded border ${t.status === 'Выполнено' ? 'bg-green-50 text-green-600 border-green-200' : (t.status === 'Не выполнено' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200')}">${t.status}</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded border ${t.status === 'Выполнено' ? 'bg-green-50 text-green-600 border-green-100' : (t.status === 'Не выполнено' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-blue-50 text-blue-600 border-blue-100')}">${t.status}</span>
                     </div>
                     `).join('')}
                     ${report.unplanned_tasks.length > 3 ? `<div class="text-xs text-slate-400 text-center py-1">...ещё ${report.unplanned_tasks.length - 3}</div>` : ''}
@@ -802,8 +799,8 @@ const renderReportItemCompact = (report) => {
             </div>
             ` : ''}
             
-            <button onclick="editReport('${report.id}')" class="w-full py-2 text-xs font-bold uppercase text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:bg-indigo-50 rounded flex items-center justify-center gap-1">
-                <i data-lucide="pencil" class="w-3 h-3"></i> Редактировать отчёт
+            <button onclick="editReport('${report.id}')" class="w-full py-2 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100 rounded-lg flex items-center justify-center gap-1 transition-colors">
+                <i data-lucide="pencil" class="w-3 h-3"></i> Редактировать
             </button>
         </div>
     </div>`;
