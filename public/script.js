@@ -156,21 +156,23 @@ const renderGoogleSheetsDashboard = () => {
     return `
     <div class="animate-fade-in">
         <div class="flex flex-col items-center mb-6 pb-4 border-b-2 border-green-600">
-            <h1 class="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3" role="banner">
-                <div class="p-3 bg-green-600 rounded-lg">
-                    <i data-lucide="table" class="w-8 h-8 text-white" aria-hidden="true"></i>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-3" role="banner">
+                <div class="p-2 bg-green-600 rounded-lg">
+                    <i data-lucide="${state.korsovetMode === 'korsovet' ? 'layout-dashboard' : 'calendar-days'}" class="w-6 h-6 text-white" aria-hidden="true"></i>
                 </div>
-                <span class="text-center">Отчеты</span>
+                <span>${state.korsovetMode === 'korsovet' ? 'Корсовет' : 'План дня руководителя'}</span>
             </h1>
-            <p class="text-sm text-slate-600 mt-2 font-medium">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <button 
-                onclick="loadAllDepartments()" 
-                class="mt-3 px-6 py-3 bg-green-600 hover:bg-green-700 text-white text-base font-bold uppercase rounded-lg flex items-center gap-2 shadow-md transition-all hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-green-300" 
-                aria-label="Обновить данные о всех отделах"
-                tabindex="0">
-                <i data-lucide="refresh-cw" class="w-5 h-5" aria-hidden="true"></i>
-                Обновить все
-            </button>
+            <div class="flex justify-between items-center w-full mt-3">
+                <p class="text-sm text-slate-600 font-medium">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <button
+                    onclick="loadAllDepartments()"
+                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 shadow-md transition-all hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-green-300"
+                    aria-label="Обновить данные о всех отделах"
+                    tabindex="0">
+                    <i data-lucide="refresh-cw" class="w-5 h-5" aria-hidden="true"></i>
+                    <span class="hidden sm:inline">Обновить</span>
+                </button>
+            </div>
         </div>
 
         <div class="bg-white border-2 border-slate-200 rounded-lg overflow-hidden mb-4" role="region" aria-labelledby="mode-selector">
@@ -200,12 +202,12 @@ const renderGoogleSheetsDashboard = () => {
                 </h2>
                 <span class="hidden text-xs text-slate-500">${Object.keys(departmentsData).length} из ${defaultSheetNames.length} загружено</span>
             </div>
-            <div class="p-2 overflow-x-auto">
-                <div class="flex gap-1" id="departmentGrid">
+            <div class="p-2">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1" id="departmentGrid">
                     ${defaultSheetNames.map(sheet => {
                         const deptData = departmentsData[sheet] || { stats: { total: 0 } };
                         return `
-                            <button onclick="switchDepartment('${sheet}')" class="department-btn flex-1 min-w-[80px] p-2 rounded-lg border-2 border-slate-200 hover:border-green-500 hover:bg-green-50 transition-all text-center ${currentDepartment === sheet ? 'border-green-600 bg-green-50' : ''}" data-dept="${sheet}">
+                            <button onclick="switchDepartment('${sheet}')" class="department-btn p-2 rounded-lg border-2 border-slate-200 hover:border-green-500 hover:bg-green-50 transition-all text-center ${currentDepartment === sheet ? 'border-green-600 bg-green-50' : ''}" data-dept="${sheet}">
                                 <div class="font-bold text-sm text-slate-900">${sheet}</div>
                                 <div class="text-xs text-slate-500">${deptData.stats?.total || 0} задач</div>
                             </button>
@@ -235,37 +237,37 @@ const renderGoogleSheetsDashboard = () => {
 // Функция для отображения задач всех отделов в режиме "План дня руководителя"
 const renderAllDepartmentsTasks = () => {
     let allTasksHtml = '';
-    
+
     // Собираем задачи из всех отделов
     for (const [deptName, deptData] of Object.entries(departmentsData)) {
         if (deptData && deptData.weeks && deptData.weeks.length > 0) {
-            // Фильтруем задачи по статусу
-            const allWeekTasks = deptData.weeks.flatMap(week => week.tasks);
-            const filteredTasks = filterTasksByStatus(allWeekTasks, state.statusFilter);
-            
+            // В режиме "План дня" задачи не разделены по неделям, объединяем все задачи
+            const allTasks = deptData.weeks.flatMap(week => week.tasks);
+            const filteredTasks = filterTasksByStatus(allTasks, state.statusFilter);
+
             if (filteredTasks.length > 0) {
                 allTasksHtml += `
                     <div class="mb-6">
                         <h3 class="text-lg font-bold text-slate-800 mb-3 px-2 py-1 bg-slate-100 rounded">${deptName}</h3>
                         <div class="space-y-3 p-3">
                             ${filteredTasks.map(task => `
-                                <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                    <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
-                                        <span class="font-bold text-slate-700">#${task.id || 'N/A'}</span>
-                                        <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                                <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200" role="listitem" tabindex="0">
+                                    <div class="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+                                        <span class="font-bold text-slate-800 text-base" aria-label="Номер задачи">#${task.id || 'N/A'}</span>
+                                        <span class="px-2.5 py-1 rounded text-xs font-bold border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
                                     </div>
-                                    <div class="p-3 space-y-2">
-                                        <div class="text-slate-900 font-medium">${task.task || ''}</div>
+                                    <div class="p-4 space-y-2.5">
+                                        <div class="text-slate-900 font-medium text-base leading-relaxed" aria-label="Описание задачи">${task.task || ''}</div>
                                         ${task.product ? `
-                                            <div class="text-sm">
-                                                <span class="text-slate-500 font-medium">📦 Продукт:</span>
-                                                <span class="text-slate-700 ml-1">${task.product}</span>
+                                            <div class="flex items-start gap-2 text-sm">
+                                                <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Продукт">📦 Продукт:</span>
+                                                <span class="text-slate-700">${task.product}</span>
                                             </div>
                                         ` : ''}
                                         ${task.comment ? `
-                                            <div class="text-sm">
-                                                <span class="text-slate-500 font-medium">💬 Комментарий:</span>
-                                                <span class="text-slate-700 ml-1">${task.comment}</span>
+                                            <div class="flex items-start gap-2 text-sm">
+                                                <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Комментарий">💬 Комментарий:</span>
+                                                <span class="text-slate-700">${task.comment}</span>
                                             </div>
                                         ` : ''}
                                     </div>
@@ -345,34 +347,34 @@ const renderDepartmentTasks = (department) => {
         
         return `
             <div class="border-b border-slate-200 last:border-0">
-                <div class="bg-green-50 px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-600 shadow-sm">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-600 shadow-sm">
                     <span class="font-bold text-green-900 text-base">${week.name}</span>
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-green-700">${weekCompleted}/${weekTotal}</span>
-                        <span class="px-3 py-1 font-bold text-white ${weekPercent >= 70 ? 'bg-green-600' : weekPercent >= 40 ? 'bg-orange-500' : 'bg-red-500'}">${weekPercent}%</span>
+                        <span class="px-3 py-1 font-bold text-white rounded ${weekPercent >= 70 ? 'bg-green-600' : weekPercent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${weekPercent}%</span>
                     </div>
                 </div>
-                
+
                 <!-- Task Cards (enhanced visual hierarchy and accessibility) -->
                 <div class="space-y-4 p-3" role="list" aria-label="Список задач">
                     ${filteredTasks.map(task => `
-                        <div class="bg-white border-2 border-slate-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow" role="listitem" tabindex="0">
-                            <div class="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b-2 border-slate-200">
-                                <span class="font-extrabold text-slate-800 text-lg" aria-label="Номер задачи">#${task.id}</span>
-                                <span class="px-3 py-1 rounded-full text-sm font-bold border-2 ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
+                        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-200" role="listitem" tabindex="0">
+                            <div class="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+                                <span class="font-bold text-slate-800 text-base" aria-label="Номер задачи">#${task.id}</span>
+                                <span class="px-2.5 py-1 rounded text-xs font-bold border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
                             </div>
-                            <div class="p-4 space-y-3">
-                                <div class="text-slate-900 font-bold text-lg" aria-label="Описание задачи">${task.task}</div>
+                            <div class="p-4 space-y-2.5">
+                                <div class="text-slate-900 font-medium text-base leading-relaxed" aria-label="Описание задачи">${task.task}</div>
                                 ${task.product ? `
-                                    <div class="flex items-start gap-2 text-base">
-                                        <span class="text-slate-500 font-semibold flex-shrink-0" aria-label="Продукт">📦 Продукт:</span>
-                                        <span class="text-slate-800 font-medium">${task.product}</span>
+                                    <div class="flex items-start gap-2 text-sm">
+                                        <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Продукт">📦 Продукт:</span>
+                                        <span class="text-slate-700">${task.product}</span>
                                     </div>
                                 ` : ''}
                                 ${task.comment ? `
-                                    <div class="flex items-start gap-2 text-base">
-                                        <span class="text-slate-500 font-semibold flex-shrink-0" aria-label="Комментарий">💬 Комментарий:</span>
-                                        <span class="text-slate-800 font-medium">${task.comment}</span>
+                                    <div class="flex items-start gap-2 text-sm">
+                                        <span class="text-slate-500 font-medium flex-shrink-0" aria-label="Комментарий">💬 Комментарий:</span>
+                                        <span class="text-slate-700">${task.comment}</span>
                                     </div>
                                 ` : ''}
                             </div>
@@ -1374,10 +1376,9 @@ const parseDepartmentData = (rows, sheetName) => {
             });
             
             if (tasks.length > 0) {
-                // Filter by current and previous month only
+                // Filter by current month only
                 const weekEndMonth = getEndMonthFromDate(dateInfo.date);
-                const monthsToShow = [currentMonth, prevMonth];
-                if (monthsToShow.includes(weekEndMonth)) {
+                if (weekEndMonth === currentMonth) {
                     weeks.push({ name: dateInfo.date, tasks: tasks });
                     tasks.forEach(task => updateStats(task, stats));
                 }
@@ -1721,8 +1722,23 @@ const getStatusClass = (status) => {
 const parseRSOData = (rows) => {
     const weeks = [];
     let currentBlock = null;
-    
+
     const weekRegex = /\d{2}\.\d{2}-\d{2}\.\d{2}(\.\d{2})?/;
+
+    // Helper function to get end month from week date (for filtering by current month)
+    const getEndMonthFromDate = (dateStr) => {
+        // Format: DD.MM-DD.MM.YY or DD.MM-DD.MM.YY.XX
+        const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})/);
+        if (parts) {
+            const startDay = parseInt(parts[1]);
+            const startMonth = parseInt(parts[2]);
+            const endDay = parseInt(parts[3]);
+            const endMonth = parseInt(parts[4]);
+            // If week starts in one month and ends in another, use end month
+            return endMonth;
+        }
+        return new Date().getMonth() + 1;
+    };
     
     rows.forEach((row) => {
         const rowText = row.join(' | ');
@@ -1777,17 +1793,60 @@ const parseRSOData = (rows) => {
     
     // Sort by date (newest first)
     const parseWeekDate = (dateStr) => {
+        // Check if year is included in the date string (format: DD.MM-DD.MM.YY)
+        const yearMatch = dateStr.match(/\.(\d{2})$/);
+        const currentYear = new Date().getFullYear();
+        const currentCentury = Math.floor(currentYear / 100) * 100; // 2000 for years in 2000s
+        
+        // Extract the year from the date string or use current year logic
+        let year = currentYear;
+        if (yearMatch) {
+            const yearSuffix = parseInt(yearMatch[1]);
+            // Determine if it's 2025, 2026, etc. based on the current year
+            // If the suffix is close to current year's suffix, use current century
+            const currentYearSuffix = currentYear % 100;
+            
+            // If the parsed year suffix is greater than current but within reasonable range, 
+            // assume it belongs to current century
+            if (yearSuffix >= currentYearSuffix && yearSuffix <= currentYearSuffix + 2) {
+                year = currentCentury + yearSuffix;
+            } else if (yearSuffix < currentYearSuffix && yearSuffix >= currentYearSuffix - 10) {
+                // For dates that might be from previous years but close to current
+                year = currentCentury + yearSuffix;
+            } else if (yearSuffix > currentYearSuffix + 2) {
+                // If the year suffix is much higher, it might be from previous century
+                year = (currentCentury - 100) + yearSuffix;
+            } else {
+                // Default to current year
+                year = currentYear;
+            }
+        }
+        
         const parts = dateStr.match(/(\d{2})\.(\d{2})-(\d{2})\.(\d{2})/);
         if (parts) {
             const [, d1, m1, d2, m2] = parts;
-            return new Date('20' + (parts[4] || '25'), parseInt(m2) - 1, parseInt(d2));
+            // Use the end date of the week for sorting purposes
+            return new Date(year, parseInt(m2) - 1, parseInt(d2));
         }
         return new Date(0);
     };
-    
-    weeks.sort((a, b) => parseWeekDate(b.period) - parseWeekDate(a.period));
-    
-    return { weeks, stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
+
+    // Filter weeks by current month only
+    const currentMonth = new Date().getMonth() + 1;
+    const filteredWeeks = weeks.filter(week => {
+        const weekEndMonth = getEndMonthFromDate(week.period);
+        return weekEndMonth === currentMonth;
+    });
+
+    // Calculate stats for current month only
+    const currentMonthStats = { total: 0, completed: 0, inProgress: 0, notCompleted: 0 };
+    filteredWeeks.forEach(week => {
+        week.tasks.forEach(task => updateStats(task, currentMonthStats));
+    });
+
+    filteredWeeks.sort((a, b) => parseWeekDate(b.period) - parseWeekDate(a.period));
+
+    return { weeks: filteredWeeks, stats: currentMonthStats };
 };
 
 // --- INIT ---
