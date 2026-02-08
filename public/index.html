@@ -98,11 +98,9 @@
     <script>
       // Conditionally load Agentation in development environment
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-        // Dynamically load the Agentation component
         const script = document.createElement('script');
-        script.src = 'https://unpkg.com/agentation/dist/index.js';
+        script.src = 'https://unpkg.com/agentation@2.2.0/dist/index.umd.js';
         script.onload = () => {
-          // Create the Agentation element after the module loads
           const agentationEl = document.createElement('agentation-component');
           document.body.appendChild(agentationEl);
         };

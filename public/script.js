@@ -18,6 +18,7 @@ window.logout = () => {
 window.switchKorsovetMode = (mode) => {
     const previousMode = state.korsovetMode;
     state.korsovetMode = mode;
+    state.expandedTasks = {};
 
     if (mode === 'plan_dnya') {
         loadDirectorPlanData();
@@ -94,7 +95,8 @@ const state = {
     period: { week_dates: getWeekRange(), is_manual: false },
     history: [],
     view: 'sheets',
-    deadlinePassed: false
+    deadlinePassed: false,
+    expandedTasks: {}
 };
 
 const DEPARTMENTS = ['НП', 'РОП', 'ГИ', 'ТД', 'ИТОП', 'КД', 'РОМ', 'РОПР', 'РСО', 'СЛ', 'РТКО', 'тест'];
@@ -200,7 +202,7 @@ const renderGoogleSheetsDashboard = () => {
                     ${defaultSheetNames.map(sheet => {
                         const deptData = departmentsData[sheet] || { stats: { total: 0 } };
                         return `
-                            <button onclick="switchDepartment('${sheet}')" class="department-btn p-3 rounded-xl border-2 border-slate-100 hover:border-green-400 hover:bg-green-50/50 transition-all text-center ${currentDepartment === sheet ? 'border-green-500 bg-green-50' : ''}" data-dept="${sheet}">
+                            <button onclick="switchDepartment('${sheet}')" class="department-btn p-3 rounded-xl border-2 border-slate-100 hover:border-green-400 hover:bg-green-50/50 transition-all text-center cursor-pointer ${currentDepartment === sheet ? 'border-green-500 bg-green-50' : ''}" data-dept="${sheet}">
                                 <div class="font-semibold text-slate-900">${sheet}</div>
                                 <div class="text-xs text-slate-500 mt-0.5">${deptData.stats?.total || 0}</div>
                             </button>
@@ -244,22 +246,28 @@ const renderAllDepartmentsTasks = () => {
                         <h3 class="text-base font-semibold text-slate-800 mb-3 px-3 py-1.5 bg-slate-50 rounded-lg inline-block">${deptName}</h3>
                         <div class="space-y-3">
                             ${filteredTasks.map(task => `
-                                <div class="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-soft hover:shadow-soft-lg transition-all duration-200 card-hover" role="listitem" tabindex="0">
-                                    <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100">
-                                        <span class="font-semibold text-slate-700" aria-label="Номер задачи">#${task.id || 'N/A'}</span>
-                                        <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
+                                <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-soft hover:shadow-lg transition-all duration-300 cursor-pointer card-hover"
+                                     role="listitem" tabindex="0"
+                                     onclick="toggleTaskDetails('all_${task.id}')"
+                                     onkeydown="if(event.key==='Enter'||event.key===' ') toggleTaskDetails('all_${task.id}')">
+                                    <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors">
+                                        <span class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm">${task.id || 'N/A'}</span>
+                                        <div class="flex items-center gap-3">
+                                            <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус: ${task.status || 'без статуса'}">${task.status || '-'}</span>
+                                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300 ${state.expandedTasks['all_' + task.id] ? 'rotate-180' : ''}" aria-hidden="true"></i>
+                                        </div>
                                     </div>
-                                    <div class="p-4 space-y-2">
+                                    <div class="p-4 space-y-3 ${state.expandedTasks['all_' + task.id] ? 'block' : 'line-clamp-2'}">
                                         <div class="text-slate-900 font-medium leading-relaxed" aria-label="Описание задачи">${task.task || ''}</div>
                                         ${task.product ? `
                                             <div class="flex items-start gap-2 text-sm">
-                                                <span class="text-slate-500 flex-shrink-0" aria-label="Продукт">📦</span>
+                                                <i data-lucide="package" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
                                                 <span class="text-slate-600">${task.product}</span>
                                             </div>
                                         ` : ''}
                                         ${task.comment ? `
                                             <div class="flex items-start gap-2 text-sm">
-                                                <span class="text-slate-500 flex-shrink-0" aria-label="Комментарий">💬</span>
+                                                <i data-lucide="message-square" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
                                                 <span class="text-slate-600">${task.comment}</span>
                                             </div>
                                         ` : ''}
@@ -350,22 +358,28 @@ const renderDepartmentTasks = (department) => {
 
                 <div class="space-y-3 p-3" role="list" aria-label="Список задач">
                     ${filteredTasks.map(task => `
-                        <div class="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-soft hover:shadow-soft-lg transition-all duration-200 card-hover" role="listitem" tabindex="0">
-                            <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100">
-                                <span class="font-semibold text-slate-700" aria-label="Номер задачи">#${task.id}</span>
-                                <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус задачи: ${task.status || 'без статуса'}">${task.status || '-'}</span>
+                        <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-soft hover:shadow-lg transition-all duration-300 cursor-pointer card-hover"
+                             role="listitem" tabindex="0"
+                             onclick="toggleTaskDetails('${task.id}')"
+                             onkeydown="if(event.key==='Enter'||event.key===' ') toggleTaskDetails('${task.id}')">
+                            <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors">
+                                <span class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm">${task.id}</span>
+                                <div class="flex items-center gap-3">
+                                    <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус: ${task.status || 'без статуса'}">${task.status || '-'}</span>
+                                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300 ${state.expandedTasks[task.id] ? 'rotate-180' : ''}" aria-hidden="true"></i>
+                                </div>
                             </div>
-                            <div class="p-4 space-y-2">
+                            <div class="p-4 space-y-3 ${state.expandedTasks[task.id] ? 'block' : 'line-clamp-2'}">
                                 <div class="text-slate-900 font-medium leading-relaxed" aria-label="Описание задачи">${task.task}</div>
                                 ${task.product ? `
                                     <div class="flex items-start gap-2 text-sm">
-                                        <span class="text-slate-500 flex-shrink-0" aria-label="Продукт">📦</span>
+                                        <i data-lucide="package" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
                                         <span class="text-slate-600">${task.product}</span>
                                     </div>
                                 ` : ''}
                                 ${task.comment ? `
                                     <div class="flex items-start gap-2 text-sm">
-                                        <span class="text-slate-500 flex-shrink-0" aria-label="Комментарий">💬</span>
+                                        <i data-lucide="message-square" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
                                         <span class="text-slate-600">${task.comment}</span>
                                     </div>
                                 ` : ''}
@@ -494,13 +508,14 @@ const renderRSODepartment = (data) => {
 window.switchDepartment = (dept) => {
     currentDepartment = dept;
     state.statusFilter = 'all';
+    state.expandedTasks = {};
 
     document.querySelectorAll('.department-btn').forEach(btn => {
         if (btn && btn.dataset && btn.dataset.dept === dept) {
-            btn.classList.add('border-green-600', 'bg-green-50');
+            btn.classList.add('border-green-500', 'bg-green-50');
             btn.classList.remove('border-slate-200');
         } else if (btn) {
-            btn.classList.remove('border-green-600', 'bg-green-50');
+            btn.classList.remove('border-green-500', 'bg-green-50');
             btn.classList.add('border-slate-200');
         }
     });
@@ -516,6 +531,29 @@ window.switchDepartment = (dept) => {
     const filterSelect = document.getElementById('statusFilterSelect');
     if (filterSelect) filterSelect.value = 'all';
 
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.toggleTaskDetails = (taskId) => {
+    state.expandedTasks[taskId] = !state.expandedTasks[taskId];
+    const container = document.querySelector('.overflow-x-auto.custom-scrollbar');
+    if (container) {
+        if (state.korsovetMode === 'plan_dnya') {
+            container.innerHTML = `
+                <div class="mb-4">
+                    <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 cursor-pointer shadow-soft">
+                        <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
+                        <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
+                        <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
+                        <option value="not_done" ${state.statusFilter === 'not_done' ? 'selected' : ''}>✕ Не выполнено</option>
+                    </select>
+                </div>
+                ${renderAllDepartmentsTasks()}
+            `;
+        } else {
+            container.innerHTML = renderDepartmentTasks(currentDepartment);
+        }
+    }
     if (typeof lucide !== 'undefined') lucide.createIcons();
 };
 
