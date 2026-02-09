@@ -162,17 +162,14 @@ const renderGoogleSheetsDashboard = () => {
     return `
     <div class="animate-fade-in-up">
         <div class="flex flex-row justify-between items-center mb-4 pb-3 border-b border-slate-200">
-            <div class="flex flex-col">
-                <h1 class="text-xl font-bold text-slate-900 tracking-tight" role="banner">${state.korsovetMode === 'korsovet' ? 'Корсовет' : 'План дня'}</h1>
-                <p class="text-sm text-slate-500">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            </div>
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight" role="banner">${state.korsovetMode === 'korsovet' ? 'Корсовет' : 'План дня'}</h1>
+            <span class="text-sm font-medium text-slate-700">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             <button
                 onclick="loadAllDepartments()"
                 class="px-4 py-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-xl flex items-center gap-2 transition-all duration-200 shadow-soft hover:shadow-lg transform active:scale-[0.98]"
                 aria-label="Обновить данные"
                 tabindex="0">
                 <i data-lucide="refresh-cw" class="w-4 h-4" aria-hidden="true"></i>
-                <span class="hidden sm:inline">Обновить</span>
             </button>
         </div>
 
