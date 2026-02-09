@@ -19,6 +19,7 @@ window.switchKorsovetMode = (mode) => {
     const previousMode = state.korsovetMode;
     state.korsovetMode = mode;
     state.expandedTasks = {};
+    state.selectedDeptForPlanDay = null;
 
     if (mode === 'plan_dnya') {
         loadDirectorPlanData();
@@ -96,7 +97,8 @@ const state = {
     history: [],
     view: 'sheets',
     deadlinePassed: false,
-    expandedTasks: {}
+    expandedTasks: {},
+    selectedDeptForPlanDay: null
 };
 
 const DEPARTMENTS = ['НП', 'РОП', 'ГИ', 'ТД', 'ИТОП', 'КД', 'РОМ', 'РОПР', 'РСО', 'СЛ', 'РТКО', 'тест'];
@@ -231,71 +233,123 @@ const renderGoogleSheetsDashboard = () => {
 
 // Функция для отображения задач всех отделов в режиме "План дня руководителя"
 const renderAllDepartmentsTasks = () => {
-    let allTasksHtml = '';
+    const effectiveSelectedDept = state.selectedDeptForPlanDay || currentDepartment;
+    console.log(`renderAllDepartmentsTasks: selectedDeptForPlanDay=${state.selectedDeptForPlanDay}, currentDepartment=${currentDepartment}, effective=${effectiveSelectedDept}`);
 
-    // Собираем задачи из всех отделов
-    for (const [deptName, deptData] of Object.entries(departmentsData)) {
-        if (deptData && deptData.weeks && deptData.weeks.length > 0) {
-            // В режиме "План дня" задачи не разделены по неделям, объединяем все задачи
-            const allTasks = deptData.weeks.flatMap(week => week.tasks);
-            const filteredTasks = filterTasksByStatus(allTasks, state.statusFilter);
+    let deptsToRender = Object.entries(departmentsData);
 
-            if (filteredTasks.length > 0) {
-                allTasksHtml += `
-                    <div class="mb-4">
-                        <h3 class="text-base font-semibold text-slate-800 mb-3 px-3 py-1.5 bg-slate-50 rounded-lg inline-block">${deptName}</h3>
-                        <div class="space-y-3">
-                            ${filteredTasks.map(task => `
-                                <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-soft hover:shadow-lg transition-all duration-300 cursor-pointer card-hover"
-                                     role="listitem" tabindex="0"
-                                     onclick="toggleTaskDetails('all_${task.id}')"
-                                     onkeydown="if(event.key==='Enter'||event.key===' ') toggleTaskDetails('all_${task.id}')">
-                                    <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors">
-                                        <span class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm">${task.id || 'N/A'}</span>
-                                        <div class="flex items-center gap-3">
-                                            <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус: ${task.status || 'без статуса'}">${task.status || '-'}</span>
-                                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300 ${state.expandedTasks['all_' + task.id] ? 'rotate-180' : ''}" aria-hidden="true"></i>
-                                        </div>
-                                    </div>
-                                    <div class="p-4 space-y-3 ${state.expandedTasks['all_' + task.id] ? 'block' : 'line-clamp-2'}">
-                                        <div class="text-slate-900 font-medium leading-relaxed" aria-label="Описание задачи">${task.task || ''}</div>
-                                        ${task.product ? `
-                                            <div class="flex items-start gap-2 text-sm">
-                                                <i data-lucide="package" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
-                                                <span class="text-slate-600">${task.product}</span>
-                                            </div>
-                                        ` : ''}
-                                        ${task.comment ? `
-                                            <div class="flex items-start gap-2 text-sm">
-                                                <i data-lucide="message-square" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
-                                                <span class="text-slate-600">${task.comment}</span>
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
+    if (effectiveSelectedDept) {
+        deptsToRender = deptsToRender.filter(([name, _]) => {
+            console.log(`Filtering: ${name} === ${effectiveSelectedDept}? ${name === effectiveSelectedDept}`);
+            return name === effectiveSelectedDept;
+        });
+    }
+
+    console.log(`Departments to render: ${deptsToRender.map(([n,_])=>n).join(', ')}`);
+
+    if (effectiveSelectedDept) {
+        const deptData = departmentsData[effectiveSelectedDept];
+        if (deptData && deptData.dateBlocks) {
+            console.log(`Date blocks in ${effectiveSelectedDept}:`, deptData.dateBlocks.map(b => `${b.date} (${b.tasks.length} tasks)`));
         }
     }
-    
-    if (!allTasksHtml) {
-        allTasksHtml = '<div class="p-8 text-center text-slate-400">Нет задач для отображения. Нажмите "Обновить" для загрузки.</div>';
+
+    const sortedDepts = deptsToRender
+        .filter(([_, deptData]) => deptData && deptData.tasks && deptData.tasks.length > 0 && deptData.dateBlocks && deptData.dateBlocks.length > 0)
+        .sort((a, b) => {
+            const dateA = a[1].dateBlocks[0]?.date || '';
+            const dateB = b[1].dateBlocks[0]?.date || '';
+            return parseDateString(dateB) - parseDateString(dateA);
+        });
+
+    let html = '';
+
+    for (const [deptName, deptData] of sortedDepts) {
+        const filteredBlocks = deptData.dateBlocks.map(block => {
+            const filteredTasks = filterTasksByStatus(block.tasks, state.statusFilter);
+            return { ...block, tasks: filteredTasks };
+        }).filter(block => block.tasks.length > 0);
+
+        if (filteredBlocks.length === 0) continue;
+
+        for (const block of filteredBlocks) {
+            const completedCount = block.tasks.filter(t => (t.status || '').toLowerCase().includes('выполнено')).length;
+            const totalCount = block.tasks.length;
+            const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+            html += `<div class="border-b border-slate-100 last:border-0 mb-4">`;
+            html += `<div class="bg-white px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-500 shadow-soft rounded-r-xl">`;
+            html += `<span class="font-semibold text-slate-800">${block.date}</span>`;
+            html += `<div class="flex items-center gap-2">`;
+            html += `<span class="text-sm text-slate-500">${completedCount}/${totalCount}</span>`;
+            html += `<span class="px-3 py-1 font-semibold text-white rounded-full ${percent >= 70 ? 'bg-green-500' : percent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${percent}%</span>`;
+            html += `</div>`;
+            html += `</div>`;
+
+            html += `<div class="space-y-3 p-3" role="list" aria-label="Список задач">`;
+
+            for (const task of block.tasks) {
+                const expandedKey = 'all_' + task.id + '_' + deptName + '_' + block.date;
+                const isExpanded = state.expandedTasks[expandedKey] || false;
+
+                html += `<div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-soft hover:shadow-lg transition-all duration-300 cursor-pointer card-hover" role="listitem" tabindex="0" onclick="toggleTaskDetails('${expandedKey}')" onkeydown="if(event.key==='Enter'||event.key===' ') toggleTaskDetails('${expandedKey}')">`;
+                html += `<div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors">`;
+                html += `<span class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm">${task.id}</span>`;
+                html += `<div class="flex items-center gap-3">`;
+                html += `<span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}">${task.statusRaw || task.status || '-'}</span>`;
+                html += `<i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}"></i>`;
+                html += `</div>`;
+                html += `</div>`;
+                html += `<div class="p-4 space-y-3 ${isExpanded ? 'block' : 'line-clamp-2'}">`;
+                html += `<div class="text-slate-900 font-medium leading-relaxed">${task.task || ''}</div>`;
+
+                if (task.product) {
+                    html += `<div class="flex items-start gap-2 text-sm">`;
+                    html += `<i data-lucide="package" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0"></i>`;
+                    html += `<span class="text-slate-600">${task.product}</span>`;
+                    html += `</div>`;
+                }
+
+                if (task.timePlan || task.timeFact) {
+                    html += `<div class="flex items-center gap-3 text-xs text-slate-500">`;
+                    if (task.timePlan) html += `<span>План: ${task.timePlan}</span>`;
+                    if (task.timeFact) html += `<span>Факт: ${task.timeFact}</span>`;
+                    html += `</div>`;
+                }
+
+                if (task.comment) {
+                    html += `<div class="flex items-start gap-2 text-sm">`;
+                    html += `<i data-lucide="message-square" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0"></i>`;
+                    html += `<span class="text-slate-600">${task.comment}</span>`;
+                    html += `</div>`;
+                }
+
+                html += `</div>`;
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            html += `</div>`;
+        }
     }
-    
-    return allTasksHtml;
+
+    if (!html) {
+        html = '<div class="p-8 text-center text-slate-400">Нет задач. Нажмите "Обновить".</div>';
+    }
+
+    return html;
 };
 
 const filterTasksByStatus = (tasks, filter) => {
     if (filter === 'all') return tasks;
     return tasks.filter(task => {
         const status = (task.status || '').toLowerCase();
+        const statusRaw = (task.statusRaw || '').toLowerCase();
+        const combinedStatus = status + ' ' + statusRaw;
         switch (filter) {
-            case 'done': return status.includes('выполн');
-            case 'in_progress': return status.includes('работе') || status.includes('progress');
-            case 'not_done': return status.includes('не выполн');
+            case 'done': return combinedStatus.includes('выполн');
+            case 'in_progress': return combinedStatus.includes('работ') || combinedStatus.includes('процессе') || combinedStatus.includes('progress');
+            case 'not_done': return combinedStatus.includes('не выполн');
             default: return true;
         }
     });
@@ -525,7 +579,23 @@ window.switchDepartment = (dept) => {
 
     const container = document.querySelector('.overflow-x-auto.custom-scrollbar');
     if (container) {
-        container.innerHTML = renderDepartmentTasks(dept);
+        if (state.korsovetMode === 'plan_dnya') {
+            state.selectedDeptForPlanDay = dept;
+            container.innerHTML = `
+                <div class="mb-4">
+                    <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 cursor-pointer shadow-soft">
+                        <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
+                        <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
+                        <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
+                        <option value="not_done" ${state.statusFilter === 'not_done' ? 'selected' : ''}>✕ Не выполнено</option>
+                    </select>
+                </div>
+                ${renderAllDepartmentsTasks()}
+            `;
+        } else {
+            state.selectedDeptForPlanDay = null;
+            container.innerHTML = renderDepartmentTasks(dept);
+        }
     }
 
     const filterSelect = document.getElementById('statusFilterSelect');
@@ -1440,67 +1510,151 @@ const parseDepartmentData = (rows, sheetName) => {
 
 // Специальная функция для обработки данных из таблицы "План дня руководителя"
 const parseDirectorPlanData = (rows, sheetName) => {
-    if (!rows || rows.length === 0) return { weeks: [], stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 } };
+    if (!rows || rows.length === 0) return { tasks: [], stats: { total: 0, completed: 0, inProgress: 0, notCompleted: 0 }, dateBlocks: [] };
 
-    // Для таблицы "План дня руководителя" структура может быть иной
-    // Обычно это текущие задачи без разделения по неделям
-    
-    const tasks = [];
-    let stats = { total: 0, completed: 0, inProgress: 0, notCompleted: 0 };
+    const dateBlocks = [];
+    const dateRegex = /(\d{1,2})\.(\d{1,2})\.(\d{2,4})/;
+    let currentBlock = null;
 
-    // Пропускаем заголовки (первые несколько строк)
-    const startIndex = rows.findIndex(row => 
-        row.some(cell => 
-            cell && typeof cell === 'string' && 
-            (cell.toLowerCase().includes('задача') || 
-             cell.toLowerCase().includes('статус') || 
-             cell.toLowerCase().includes('результат'))
-        )
-    );
-    
-    const dataRows = startIndex >= 0 ? rows.slice(startIndex + 1) : rows;
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length < 2) continue;
 
-    // Обрабатываем строки с задачами
-    dataRows.forEach((row, index) => {
-        if (row && row.length >= 3) { // Должно быть как минимум ID, задача и статус
-            const task = {
-                id: row[0] || index + 1,
-                task: row[1] || '',
-                product: row[2] || '',
-                status: row[3] || 'Без статуса',
-                comment: row[4] || ''
-            };
+        const rowStr = row.join(' ');
 
-            if (task.task && task.task.trim() !== '') {
-                tasks.push(task);
-                
-                // Обновляем статистику
-                stats.total++;
-                const statusLower = task.status.toLowerCase();
-                if (statusLower.includes('выполн') || statusLower.includes('done')) {
-                    stats.completed++;
-                } else if (statusLower.includes('работе') || statusLower.includes('progress')) {
-                    stats.inProgress++;
-                } else if (statusLower.includes('не выполн') || statusLower.includes('not done')) {
-                    stats.notCompleted++;
-                } else {
-                    // Без статуса
+        if (dateRegex.test(rowStr)) {
+            const dateMatch = rowStr.match(dateRegex);
+            if (dateMatch) {
+                let year = parseInt(dateMatch[3]);
+                if (dateMatch[3].length === 2) {
+                    year = 2000 + year;
                 }
+                const currentYear = new Date().getFullYear();
+                const currentMonth = new Date().getMonth();
+                const parsedMonth = parseInt(dateMatch[2]) - 1;
+                if (year > currentYear || (year === currentYear && parsedMonth > currentMonth)) {
+                    year = year - 1;
+                }
+                const day = dateMatch[1].padStart(2, '0');
+                const month = dateMatch[2].padStart(2, '0');
+                const dateStr = `${day}.${month}.${year}`;
+
+                currentBlock = {
+                    date: dateStr,
+                    tasks: [],
+                    rawDate: dateMatch[0]
+                };
+                dateBlocks.push(currentBlock);
             }
+            continue;
         }
+
+        if (currentBlock && row[0] && (row[0].toString().match(/^\d+$/) || row[0] === 'НЕПРЕДВИДЕНЫЕ')) {
+            if (row[0] === 'НЕПРЕДВИДЕНЫЕ' || row[0]?.includes('НЕПРЕДВИДЕНЫЕ')) {
+                continue;
+            }
+
+            const id = row[0];
+            const task = row[1] || '';
+            const product = row[6] || '';
+            const statusRaw = row[9] || 'Без статуса';
+            const timePlan = row[8] || '';
+            const timeFact = row[10] || '';
+            const comment = row[11] || '';
+
+            if (!task.trim()) continue;
+
+            let status = 'Без статуса';
+            const statusLower = statusRaw.toLowerCase();
+            if (statusLower.includes('выполнил') || statusLower.includes('выполнено') || statusLower.includes('done')) {
+                status = 'Выполнено';
+            } else if (statusLower.includes('процессе') || statusLower.includes('progress')) {
+                status = 'В работе';
+            } else if (statusLower.includes('не выполнил') || statusLower.includes('не выполнено') || statusLower.includes('not done')) {
+                status = 'Не выполнено';
+            }
+
+            currentBlock.tasks.push({
+                id: id,
+                task: task,
+                product: product,
+                timePlan: timePlan,
+                timeFact: timeFact,
+                status: status,
+                statusRaw: statusRaw,
+                comment: comment
+            });
+        }
+    }
+
+    const stats = { total: 0, completed: 0, inProgress: 0, notCompleted: 0 };
+
+    dateBlocks.forEach(block => {
+        block.tasks.forEach(task => {
+            stats.total++;
+            if (task.status === 'Выполнено') stats.completed++;
+            else if (task.status === 'В работе') stats.inProgress++;
+            else if (task.status === 'Не выполнено') stats.notCompleted++;
+        });
     });
 
-    // Создаем одну "неделю" с текущими задачами
-    const currentDate = new Date();
-    const currentWeekRange = getWeekRange(); // используем функцию для получения текущего диапазона недели
-    
+    const now = new Date();
+    const todayStr = String(now.getDate()).padStart(2, '0') + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + now.getFullYear();
+
+    dateBlocks.forEach(block => {
+        console.log(`Date block found: "${block.date}", raw: "${block.rawDate}"`);
+    });
+
+    dateBlocks.sort((a, b) => {
+        const dateA = parseDateForSort(a.date);
+        const dateB = parseDateForSort(b.date);
+        return dateB - dateA;
+    });
+
+    const relevantDateBlocks = dateBlocks.filter(block => {
+        const isFutureOrToday = block.date >= todayStr;
+        if (!isFutureOrToday) {
+            console.log(`Filtering out past date: ${block.date} (today: ${todayStr})`);
+        }
+        return isFutureOrToday;
+    });
+
+    const allTasks = relevantDateBlocks.flatMap(b => b.tasks);
+
     return {
-        weeks: [{
-            name: currentWeekRange,
-            tasks: tasks
-        }],
-        stats: stats
+        tasks: allTasks,
+        stats: stats,
+        dateBlocks: relevantDateBlocks,
+        latestDate: relevantDateBlocks[0]?.date || ''
     };
+};
+
+const parseDateForSort = (dateStr) => {
+    const parts = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+    if (!parts) return 0;
+    const day = parseInt(parts[1]);
+    const month = parseInt(parts[2]);
+    const year = parseInt(parts[3]);
+    if (parts[3].length === 2) year = 2000 + year;
+    return new Date(year, month - 1, day).getTime();
+};
+
+const parseDate = (dateStr) => {
+    const parts = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+    if (!parts) return new Date(0);
+    let year = parseInt(parts[3]);
+    if (parts[3].length === 2) year = 2000 + year;
+    return new Date(year, parseInt(parts[2]) - 1, parseInt(parts[1]));
+};
+
+const parseDateString = (dateStr) => {
+    const parts = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+    if (!parts) return new Date(0);
+    const day = parseInt(parts[1]);
+    const month = parseInt(parts[2]) - 1;
+    let year = parseInt(parts[3]);
+    if (parts[3].length === 2) year = 2000 + year;
+    return new Date(year, month, day);
 };
 
 const parseRoPRData = (rows) => {
@@ -1747,10 +1901,11 @@ const renderSheetsTable = (rows) => {
 };
 
 const getStatusClass = (status) => {
-    if (status?.toLowerCase().includes('не выполн')) return 'bg-red-100 text-red-700 border-red-200';
-    if (status?.toLowerCase().includes('выполн')) return 'bg-green-100 text-green-700 border-green-200';
-    if (status?.toLowerCase().includes('работе')) return 'bg-orange-100 text-orange-700 border-orange-200';
-    if (status?.toLowerCase().includes('без статуса')) return 'bg-slate-100 text-slate-700 border-slate-200';
+    const statusLower = (status || '').toLowerCase();
+    if (statusLower.includes('не выполнил') || statusLower.includes('не выполнено')) return 'bg-red-100 text-red-700 border-red-200';
+    if (statusLower.includes('выполнил') || statusLower.includes('выполнено') || statusLower.includes('done')) return 'bg-green-100 text-green-700 border-green-200';
+    if (statusLower.includes('процессе') || statusLower.includes('работ') || statusLower.includes('progress')) return 'bg-blue-100 text-blue-700 border-blue-200';
+    if (statusLower.includes('без статуса')) return 'bg-slate-100 text-slate-700 border-slate-200';
     return 'bg-gray-100 text-gray-600 border-gray-200';
 };
 
