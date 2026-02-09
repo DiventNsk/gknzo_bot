@@ -1,7 +1,12 @@
 const { chromium } = require('playwright');
 
 async function testApp() {
-    const browser = await chromium.launch({ headless: true });
+    console.log('Launching browser...');
+    const browser = await chromium.launch({
+        headless: true,
+        viewport: { width: 1920, height: 1080 }
+    });
+
     const context = await browser.newContext();
     const page = await context.newPage();
 
@@ -37,7 +42,8 @@ async function testApp() {
             await page.waitForTimeout(2000);
         }
 
-        await page.waitForTimeout(2000);
+        console.log('Waiting for page to render...');
+        await page.waitForTimeout(3000);
 
         const title = await page.title();
         console.log('Page title:', title);
@@ -46,13 +52,36 @@ async function testApp() {
         if (h1Element) {
             const h1Text = await h1Element.textContent();
             console.log('Header text:', h1Text);
-        } else {
-            console.log('Header element not found');
+        }
+
+        console.log('\n=== Making screenshot ===');
+        await page.screenshot({ path: 'screenshot-korsovet.png', fullPage: true });
+        console.log('Screenshot saved to screenshot-korsovet.png');
+
+        console.log('\n=== Header Layout Analysis ===');
+        const h1 = await page.$('h1[role="banner"]');
+        if (h1) {
+            const box = await h1.boundingBox();
+            console.log('H1 "Корсовет": x=' + box.x + ', y=' + box.y + ', w=' + box.width);
+        }
+
+        const dateSpan = await page.locator('span').filter({ hasText: /\d/ }).first();
+        if (dateSpan) {
+            const box = await dateSpan.boundingBox();
+            console.log('Date: x=' + box.x + ', y=' + box.y + ', w=' + box.width);
+        }
+
+        const refreshBtn = await page.$('button[aria-label="Обновить данные"]');
+        if (refreshBtn) {
+            const box = await refreshBtn.boundingBox();
+            console.log('Refresh button: x=' + box.x + ', y=' + box.y + ', w=' + box.width);
         }
 
         console.log('\n=== Console Messages ===');
         consoleMessages.forEach(msg => {
-            console.log(`[${msg.type.toUpperCase()}] ${msg.text}`);
+            if (msg.type === 'error' || msg.type === 'warning') {
+                console.log(`[${msg.type.toUpperCase()}] ${msg.text}`);
+            }
         });
 
         if (errors.length > 0) {
@@ -66,6 +95,7 @@ async function testApp() {
     } catch (error) {
         console.error('Test failed:', error.message);
     } finally {
+        console.log('Closing browser...');
         await browser.close();
     }
 }

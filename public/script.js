@@ -196,14 +196,26 @@ const renderGoogleSheetsDashboard = () => {
             <div class="px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-2">
                 <span class="text-xs text-slate-500">${Object.keys(departmentsData).length} из ${defaultSheetNames.length} загружено</span>
             </div>
-            <div class="p-3">
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2" id="departmentGrid">
+            <div class="p-2 sm:p-3">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1 sm:gap-2" id="departmentGrid">
                     ${defaultSheetNames.map(sheet => {
-                        const deptData = departmentsData[sheet] || { stats: { total: 0 } };
+                        const deptData = departmentsData[sheet] || { stats: { total: 0, completed: 0 } };
+                        const completed = deptData.stats?.completed || 0;
+                        const total = deptData.stats?.total || 0;
+                        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+                        const percentClass = percent >= 70 ? 'bg-green-500' : percent >= 40 ? 'bg-amber-500' : 'bg-red-500';
+                        const textClass = percent >= 70 ? 'text-green-600' : percent >= 40 ? 'text-amber-600' : 'text-red-600';
+                        const borderClass = currentDepartment === sheet ? 'border-green-500 bg-green-50' : 'border-slate-200 hover:border-green-400 hover:bg-green-50/50';
                         return `
-                            <button onclick="switchDepartment('${sheet}')" class="department-btn p-3 rounded-xl border-2 border-slate-100 hover:border-green-400 hover:bg-green-50/50 transition-all text-center cursor-pointer ${currentDepartment === sheet ? 'border-green-500 bg-green-50' : ''}" data-dept="${sheet}">
-                                <div class="font-semibold text-slate-900">${sheet}</div>
-                                <div class="text-xs text-slate-500 mt-0.5">${deptData.stats?.total || 0}</div>
+                            <button onclick="switchDepartment('${sheet}')" class="department-btn p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 ${borderClass} transition-all text-center cursor-pointer" data-dept="${sheet}">
+                                <div class="font-bold text-slate-800 text-xs sm:text-sm">${sheet}</div>
+                                <div class="flex items-center justify-center gap-1 mt-1">
+                                    <span class="text-xs text-slate-500">${completed}/${total}</span>
+                                    <span class="text-xs font-bold ${textClass}">${percent}%</span>
+                                </div>
+                                <div class="mt-1 h-1 w-full bg-slate-200 rounded-full overflow-hidden">
+                                    <div class="h-full ${percentClass} rounded-full" style="width: ${percent}%"></div>
+                                </div>
                             </button>
                         `;
                     }).join('')}
@@ -273,54 +285,40 @@ const renderAllDepartmentsTasks = () => {
             const completedCount = block.tasks.filter(t => (t.status || '').toLowerCase().includes('выполнено')).length;
             const totalCount = block.tasks.length;
             const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+            const totalPlanMinutes = sumTimeForTasks(block.tasks, 'timePlan');
+            const totalFactMinutes = sumTimeForTasks(block.tasks, 'timeFact');
+            const planTimeStr = formatMinutesToTime(totalPlanMinutes);
+            const factTimeStr = formatMinutesToTime(totalFactMinutes);
 
-            html += `<div class="border-b border-slate-100 last:border-0 mb-4">`;
-            html += `<div class="bg-white px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-500 shadow-soft rounded-r-xl">`;
-            html += `<span class="font-semibold text-slate-800">${block.date}</span>`;
+            html += `<div class="border-b border-slate-100 last:border-0 mb-2 sm:mb-4">`;
+            html += `<div class="bg-white px-3 py-2 sm:px-4 sm:py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-l-4 border-green-500 shadow-sm rounded-r-xl">`;
+            html += `<span class="font-semibold text-slate-800 text-sm sm:text-base">${block.date}</span>`;
             html += `<div class="flex items-center gap-2">`;
-            html += `<span class="text-sm text-slate-500">${completedCount}/${totalCount}</span>`;
-            html += `<span class="px-3 py-1 font-semibold text-white rounded-full ${percent >= 70 ? 'bg-green-500' : percent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${percent}%</span>`;
+            html += `<span class="text-xs sm:text-sm text-slate-500">${completedCount}/${totalCount}</span>`;
+            html += `<span class="px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm font-semibold text-white rounded-full ${percent >= 70 ? 'bg-green-500' : percent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${percent}%</span>`;
+            if (totalPlanMinutes > 0) {
+                html += `<span class="text-xs sm:text-sm text-slate-500" title="План/Факт">⏱ ${planTimeStr}/${factTimeStr}</span>`;
+            }
             html += `</div>`;
             html += `</div>`;
 
-            html += `<div class="space-y-3 p-3" role="list" aria-label="Список задач">`;
+            html += `<div class="space-y-2 sm:space-y-3 p-2 sm:p-3" role="list" aria-label="Список задач">`;
 
             for (const task of block.tasks) {
-                const expandedKey = 'all_' + task.id + '_' + deptName + '_' + block.date;
-                const isExpanded = state.expandedTasks[expandedKey] || false;
-
-                html += `<div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-soft hover:shadow-lg transition-all duration-300 cursor-pointer card-hover" role="listitem" tabindex="0" onclick="toggleTaskDetails('${expandedKey}')" onkeydown="if(event.key==='Enter'||event.key===' ') toggleTaskDetails('${expandedKey}')">`;
-                html += `<div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors">`;
-                html += `<span class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm">${task.id}</span>`;
-                html += `<div class="flex items-center gap-3">`;
-                html += `<span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}">${task.statusRaw || task.status || '-'}</span>`;
-                html += `<i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}"></i>`;
+                html += `<div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" role="listitem">`;
+                html += `<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">`;
+                html += `<div class="flex items-center gap-2">`;
+                html += `<span class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded bg-slate-100 text-slate-600 font-semibold text-xs sm:text-sm">${task.id}</span>`;
+                html += `<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-500">`;
+                html += task.product ? `<span>📦 <span class="hidden sm:inline">${task.product}</span></span>` : '';
+                html += task.timePlan ? `<span>⏱ ${task.timePlan}${task.timeFact ? '/' + task.timeFact : ''}</span>` : '';
                 html += `</div>`;
                 html += `</div>`;
-                html += `<div class="p-4 space-y-3 ${isExpanded ? 'block' : 'line-clamp-2'}">`;
-                html += `<div class="text-slate-900 font-medium leading-relaxed">${task.task || ''}</div>`;
-
-                if (task.product) {
-                    html += `<div class="flex items-start gap-2 text-sm">`;
-                    html += `<i data-lucide="package" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0"></i>`;
-                    html += `<span class="text-slate-600">${task.product}</span>`;
-                    html += `</div>`;
-                }
-
-                if (task.timePlan || task.timeFact) {
-                    html += `<div class="flex items-center gap-3 text-xs text-slate-500">`;
-                    if (task.timePlan) html += `<span>План: ${task.timePlan}</span>`;
-                    if (task.timeFact) html += `<span>Факт: ${task.timeFact}</span>`;
-                    html += `</div>`;
-                }
-
-                if (task.comment) {
-                    html += `<div class="flex items-start gap-2 text-sm">`;
-                    html += `<i data-lucide="message-square" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0"></i>`;
-                    html += `<span class="text-slate-600">${task.comment}</span>`;
-                    html += `</div>`;
-                }
-
+                html += `<span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusClass(task.status)}">${task.statusRaw || task.status || '-'}</span>`;
+                html += `</div>`;
+                html += `<div class="px-3 py-2">`;
+                html += `<div class="text-sm sm:text-base text-slate-800 font-medium leading-relaxed">${task.task || ''}</div>`;
+                html += task.comment ? `<div class="text-xs sm:text-sm text-slate-400 mt-1">💬 ${task.comment}</div>` : '';
                 html += `</div>`;
                 html += `</div>`;
             }
@@ -409,31 +407,22 @@ const renderDepartmentTasks = (department) => {
 
                 <div class="space-y-3 p-3" role="list" aria-label="Список задач">
                     ${filteredTasks.map(task => `
-                        <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-soft hover:shadow-lg transition-all duration-300 cursor-pointer card-hover"
-                             role="listitem" tabindex="0"
-                             onclick="toggleTaskDetails('${task.id}')"
-                             onkeydown="if(event.key==='Enter'||event.key===' ') toggleTaskDetails('${task.id}')">
-                            <div class="flex justify-between items-center px-4 py-3 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors">
-                                <span class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm">${task.id}</span>
-                                <div class="flex items-center gap-3">
-                                    <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${getStatusClass(task.status)}" aria-label="Статус: ${task.status || 'без статуса'}">${task.status || '-'}</span>
-                                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300 ${state.expandedTasks[task.id] ? 'rotate-180' : ''}" aria-hidden="true"></i>
+                        <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer card-hover"
+                             role="listitem"
+                             onclick="toggleTaskDetails('${task.id}')">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded bg-slate-100 text-slate-600 font-semibold text-xs sm:text-sm">${task.id}</span>
+                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-500">
+                                        ${task.product ? `<span>📦 <span class="hidden sm:inline">${task.product}</span></span>` : ''}
+                                        ${task.timePlan ? `<span>⏱ ${task.timePlan}${task.timeFact ? '/' + task.timeFact : ''}</span>` : ''}
+                                    </div>
                                 </div>
+                                <span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusClass(task.status)}">${task.status || '-'}</span>
                             </div>
-                            <div class="p-4 space-y-3 ${state.expandedTasks[task.id] ? 'block' : 'line-clamp-2'}">
-                                <div class="text-slate-900 font-medium leading-relaxed" aria-label="Описание задачи">${task.task}</div>
-                                ${task.product ? `
-                                    <div class="flex items-start gap-2 text-sm">
-                                        <i data-lucide="package" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
-                                        <span class="text-slate-600">${task.product}</span>
-                                    </div>
-                                ` : ''}
-                                ${task.comment ? `
-                                    <div class="flex items-start gap-2 text-sm">
-                                        <i data-lucide="message-square" class="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
-                                        <span class="text-slate-600">${task.comment}</span>
-                                    </div>
-                                ` : ''}
+                            <div class="px-3 py-2">
+                                <div class="text-sm sm:text-base text-slate-800 font-medium leading-relaxed">${task.task}</div>
+                                ${task.comment ? `<div class="text-xs sm:text-sm text-slate-400 mt-1">💬 ${task.comment}</div>` : ''}
                             </div>
                         </div>
                     `).join('')}
@@ -463,7 +452,7 @@ const renderRoPRDepartment = (data) => {
             
             <!-- Indicators -->
             ${week.indicators.length > 0 ? `
-                <div class="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                <div class="bg-slate-50 px-3 py-2 sm:px-4 border-b border-slate-200">
                     <div class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">ПОКАЗАТЕЛИ</div>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         ${week.indicators.map(ind => `
@@ -479,10 +468,10 @@ const renderRoPRDepartment = (data) => {
             
             <!-- Past Week Tasks -->
             ${week.pastTasks.length > 0 ? `
-                <div class="px-4 py-2 border-b border-slate-200 bg-slate-50">
+                <div class="px-3 py-2 sm:px-4 border-b border-slate-200 bg-slate-50">
                     <div class="text-xs font-bold text-slate-600 uppercase tracking-wider">ЗАДАЧИ ПРОШЕДШЕЙ НЕДЕЛИ</div>
                 </div>
-                <div class="space-y-2 p-3">
+                <div class="space-y-2 p-2 sm:p-3">
                     ${week.pastTasks.map(task => `
                         <div class="bg-white border border-slate-200 p-3">
                             <div class="flex justify-between items-center mb-1">
@@ -499,10 +488,10 @@ const renderRoPRDepartment = (data) => {
             
             <!-- Current Week Tasks -->
             ${week.currentTasks.length > 0 ? `
-                <div class="px-4 py-2 border-b border-slate-200 bg-slate-50">
+                <div class="px-3 py-2 sm:px-4 border-b border-slate-200 bg-slate-50">
                     <div class="text-xs font-bold text-slate-600 uppercase tracking-wider">ЗАДАЧИ НА ТЕКУЩУЮ НЕДЕЛЮ</div>
                 </div>
-                <div class="space-y-2 p-3">
+                <div class="space-y-2 p-2 sm:p-3">
                     ${week.currentTasks.map(task => `
                         <div class="bg-white border border-slate-200 p-3">
                             <div class="flex justify-between items-center mb-1">
@@ -527,25 +516,25 @@ const renderRSODepartment = (data) => {
     
     return data.weeks.map(week => `
         <div class="border-b border-slate-200 last:border-0">
-            <div class="bg-green-50 px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-600 shadow-sm">
-                <span class="font-bold text-green-900 text-base">${week.period}</span>
+            <div class="bg-green-50 px-3 py-2 sm:px-4 sm:py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-l-4 border-green-600 shadow-sm">
+                <span class="font-bold text-green-900 text-sm sm:text-base">${week.period}</span>
                 <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-green-700">${week.stats.completed}/${week.stats.total}</span>
-                    <span class="px-3 py-1 font-bold text-white bg-green-600">${week.stats.percent || '0%'}</span>
+                    <span class="text-xs sm:text-sm font-medium text-green-700">${week.stats.completed}/${week.stats.total}</span>
+                    <span class="px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm font-bold text-white bg-green-600">${week.stats.percent || '0%'}</span>
                 </div>
             </div>
             
-            <div class="space-y-2 p-3">
+            <div class="space-y-2 p-2 sm:p-3">
                 ${week.tasks.map(task => `
                     <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                         <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
-                            <span class="font-bold text-slate-700">#${task.id}</span>
+                            <span class="font-bold text-slate-700 text-xs sm:text-sm">#${task.id}</span>
                             <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status}</span>
                         </div>
                         <div class="p-3 space-y-2">
-                            <div class="text-slate-900 font-medium">${task.task}</div>
-                            ${task.product ? `<div class="text-sm"><span class="text-slate-500">📦:</span><span class="text-slate-700 ml-1">${task.product}</span></div>` : ''}
-                            ${task.comment ? `<div class="text-sm"><span class="text-slate-500">💬:</span><span class="text-slate-700 ml-1">${task.comment}</span></div>` : ''}
+                            <div class="text-slate-900 font-medium text-sm">${task.task}</div>
+                            ${task.product ? `<div class="text-xs sm:text-sm"><span class="text-slate-500">📦:</span><span class="text-slate-700 ml-1">${task.product}</span></div>` : ''}
+                            ${task.comment ? `<div class="text-xs sm:text-sm"><span class="text-slate-500">💬:</span><span class="text-slate-700 ml-1">${task.comment}</span></div>` : ''}
                         </div>
                     </div>
                 `).join('')}
@@ -1652,6 +1641,25 @@ const parseDateString = (dateStr) => {
     let year = parseInt(parts[3]);
     if (parts[3].length === 2) year = 2000 + year;
     return new Date(year, month, day);
+};
+
+const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const parts = timeStr.toString().split(':');
+    if (parts.length !== 3) return 0;
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+    return hours * 60 + minutes;
+};
+
+const formatMinutesToTime = (totalMinutes) => {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+};
+
+const sumTimeForTasks = (tasks, timeField) => {
+    return tasks.reduce((sum, task) => sum + parseTimeToMinutes(task[timeField]), 0);
 };
 
 const parseRoPRData = (rows) => {
