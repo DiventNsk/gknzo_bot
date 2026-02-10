@@ -377,6 +377,10 @@ const renderDepartmentTasks = (department) => {
         return renderRoPRDepartment(data);
     }
     
+    if (department === 'РОМ') {
+        return renderROMDepartment(data);
+    }
+    
     if (department === 'РСО') {
         return renderRSODepartment(data);
     }
@@ -510,6 +514,65 @@ const renderRoPRDepartment = (data) => {
             ` : ''}
         </div>
     `).join('');
+};
+
+const renderROMDepartment = (data) => {
+    if (!data || !data.weeks || data.weeks.length === 0) {
+        return '<div class="p-8 text-center text-slate-400">Нет данных. Нажмите "Обновить" для загрузки.</div>';
+    }
+    
+    return data.weeks.map(week => {
+        const weekCompleted = week.tasks.filter(t => (t.status || '').toLowerCase().includes('выполн')).length;
+        const weekTotal = week.tasks.length;
+        const weekPercent = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
+        
+        return `
+            <div class="border-b border-slate-200 last:border-0 mb-4">
+                <div class="bg-white px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-500 shadow-soft rounded-r-xl">
+                    <span class="font-semibold text-slate-800">${week.period}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-slate-500">${weekCompleted}/${weekTotal}</span>
+                        <span class="px-3 py-1 font-semibold text-white rounded-full ${weekPercent >= 70 ? 'bg-green-500' : weekPercent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${weekPercent}%</span>
+                    </div>
+                </div>
+                
+                ${week.indicators && week.indicators.length > 0 ? `
+                    <div class="bg-slate-50 px-3 py-2 sm:px-4 border-b border-slate-200">
+                        <div class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">ПОКАЗАТЕЛИ</div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            ${week.indicators.map(ind => `
+                                <div class="bg-white rounded-lg p-2 border border-slate-200">
+                                    <div class="text-xs text-slate-500 mb-1">${ind.name}</div>
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-slate-700">Неделя: <span class="font-medium">${ind.factWeek || '-'}</span></span>
+                                        <span class="text-slate-700">Месяц: <span class="font-medium">${ind.factMonth || '-'}</span></span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <div class="space-y-3 p-3" role="list" aria-label="Список задач">
+                    ${week.tasks.map(task => `
+                        <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer card-hover"
+                             role="listitem">
+                            <div class="flex flex-row justify-between items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded bg-slate-100 text-slate-600 font-semibold text-xs sm:text-sm">${task.id}</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                            </div>
+                            <div class="px-3 py-2">
+                                <div class="text-sm sm:text-base text-slate-800 font-medium leading-relaxed">${task.task}</div>
+                                ${task.product ? `<div class="text-xs sm:text-sm text-slate-500 mt-1">📦 ${task.product}</div>` : ''}
+                                ${task.timePlan || task.timeFact ? `<div class="text-xs sm:text-sm text-slate-500 mt-1">⏱ ${task.timePlan || ''}${task.timeFact ? ' / ' + task.timeFact : ''}</div>` : ''}
+                                ${task.comment ? `<div class="text-xs sm:text-sm text-slate-400 mt-1">💬 ${task.comment}</div>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }).join('') + (data.weeks.every(week => week.tasks.length === 0) ? '<div class="p-8 text-center text-slate-400">Нет задач</div>' : '')
 };
 
 const renderRSODepartment = (data) => {
@@ -1440,9 +1503,9 @@ const parseDepartmentData = (rows, sheetName) => {
 
     const config = configs[sheetName] || { dateCol: 2, format: 'standard', taskCol: 2 };
 
-    // For РОМ - different format
+    // For РОМ - different format with indicators and tasks
     if (config.format === 'rom') {
-        return { weeks: [{ name: 'Показатели', tasks: rows.slice(0, 10).map((r, i) => ({ id: i+1, task: r.join(' | ').substring(0, 100), product: '', status: 'Без статуса', comment: '' })) }], stats: { total: 10, completed: 0, inProgress: 0, notCompleted: 10 } };
+        return parseROMData(rows);
     }
 
     // For РОПР - special complex format with indicators, past tasks, current tasks
@@ -1704,6 +1767,113 @@ const formatMinutesToTime = (totalMinutes) => {
 
 const sumTimeForTasks = (tasks, timeField) => {
     return tasks.reduce((sum, task) => sum + parseTimeToMinutes(task[timeField]), 0);
+};
+
+const parseROMData = (rows) => {
+    const weeks = [];
+    const currentMonth = new Date().getMonth() + 1;
+    
+    const weekRegex = /\d{2}\.\d{2}-\d{2}\.\d{2}/;
+    let currentBlock = null;
+    let indicators = [];
+    
+    rows.forEach((row, index) => {
+        const rowText = row.join(' | ');
+        
+        // Check for week date row
+        for (let i = 0; i < row.length; i++) {
+            if (weekRegex.test(row[i])) {
+                if (currentBlock) weeks.push(currentBlock);
+                
+                // Parse indicators from rows 1-9 (after week row)
+                indicators = [];
+                for (let j = 1; j < Math.min(10, rows.length); j++) {
+                    const indRow = rows[index + j];
+                    if (indRow && indRow[0] && !indRow[0].includes('№') && !indRow[0].includes('ПОКАЗАТЕЛИ')) {
+                        const indicatorName = indRow[0]?.trim();
+                        if (indicatorName && indicatorName !== '№') {
+                            indicators.push({
+                                name: indicatorName,
+                                factWeek: indRow[4]?.trim() || '',
+                                factMonth: indRow[6]?.trim() || ''
+                            });
+                        }
+                    }
+                    if (indRow && indRow[0] === '№') break;
+                }
+                
+                currentBlock = {
+                    period: row[i],
+                    tasks: [],
+                    indicators: indicators,
+                    stats: { completed: 0, total: 0, percent: '0%' }
+                };
+                break;
+            }
+        }
+        
+        if (!currentBlock) return;
+        
+        // Skip header rows
+        if (row[0] === '№' || row[0] === 'ПОКАЗАТЕЛИ' || row[0] === 'Неделя') return;
+        if (row[0] === 'Незапланировано') return;
+        
+        // Check for stats rows
+        if (rowText.includes('Выполнено задач за')) {
+            const statsMatch = rowText.match(/из\s*(\d+).*?(\d+[,.]?\d*)%/);
+            if (statsMatch) {
+                currentBlock.stats.completed = parseInt(statsMatch[1]) || 0;
+                currentBlock.stats.percent = statsMatch[2] + '%';
+            }
+        } else
+        if (row[0] && /^\d+$/.test(row[0])) {
+            const task = {
+                id: parseInt(row[0]),
+                task: row[1]?.trim() || '',
+                product: row[6]?.trim() || '',
+                timePlan: row[8]?.trim() || '',
+                result: row[9]?.trim() || '',
+                timeFact: row[10]?.trim() || '',
+                comment: row[11]?.trim() || '',
+                status: row[9]?.trim() || 'Без статуса'
+            };
+            
+            if (task.task || task.product || task.comment) {
+                currentBlock.tasks.push(task);
+                currentBlock.stats.total++;
+                if (task.status.toLowerCase().includes('выполнено')) {
+                    currentBlock.stats.completed++;
+                }
+            }
+        }
+    });
+    
+    if (currentBlock) weeks.push(currentBlock);
+    
+    // Filter by current month only
+    const filteredWeeks = weeks.filter(week => {
+        const dateMatch = week.period.match(/(\d{2})\.(\d{2})/);
+        if (dateMatch) {
+            const month = parseInt(dateMatch[2]);
+            return month === currentMonth;
+        }
+        return false;
+    });
+    
+    // Calculate stats
+    const stats = { total: 0, completed: 0, inProgress: 0, notCompleted: 0 };
+    filteredWeeks.forEach(week => {
+        week.tasks.forEach(task => {
+            stats.total++;
+            const status = (task.status || '').toLowerCase();
+            if (status.includes('выполнено')) stats.completed++;
+            else if (status.includes('работ') || status.includes('процессе')) stats.inProgress++;
+            else if (status.includes('не выполн')) stats.notCompleted++;
+        });
+    });
+    stats.percent = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) + '%' : '0%';
+    
+    return { weeks: filteredWeeks, stats };
 };
 
 const parseRoPRData = (rows) => {
