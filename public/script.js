@@ -93,6 +93,7 @@ const state = {
     reportType: 'weekly',
     korsovetMode: 'korsovet',
     statusFilter: 'all',
+    focusMode: false,
     period: { week_dates: getWeekRange(), is_manual: false },
     history: [],
     view: 'sheets',
@@ -173,19 +174,19 @@ const renderGoogleSheetsDashboard = () => {
             </button>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden mb-4" role="region" aria-labelledby="mode-selector">
-            <div class="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-center">
-                <div class="flex gap-1 p-1 bg-slate-100 rounded-lg" id="mode-selector">
+            <div class="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden mb-4" role="region" aria-labelledby="mode-selector">
+            <div class="bg-slate-50 px-2 py-2 border-b border-slate-100">
+                <div class="grid grid-cols-2 gap-1" id="mode-selector">
                     <button 
                         onclick="switchKorsovetMode('korsovet')" 
-                        class="px-5 py-2 text-sm font-medium rounded-md transition-all ${state.korsovetMode === 'korsovet' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}" 
+                        class="px-5 py-3 text-sm font-bold rounded-lg transition-all ${state.korsovetMode === 'korsovet' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" 
                         aria-pressed="${state.korsovetMode === 'korsovet'}"
                         tabindex="0">
                         Корсовет
                     </button>
                     <button 
                         onclick="switchKorsovetMode('plan_dnya')" 
-                        class="px-5 py-2 text-sm font-medium rounded-md transition-all ${state.korsovetMode === 'plan_dnya' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}" 
+                        class="px-5 py-3 text-sm font-bold rounded-lg transition-all ${state.korsovetMode === 'plan_dnya' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" 
                         aria-pressed="${state.korsovetMode === 'plan_dnya'}"
                         tabindex="0">
                         План дня
@@ -193,9 +194,6 @@ const renderGoogleSheetsDashboard = () => {
                 </div>
             </div>
 
-            <div class="px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-2">
-                <span class="text-xs text-slate-500">${Object.keys(departmentsData).length} из ${defaultSheetNames.length} загружено</span>
-            </div>
             <div class="p-2 sm:p-3">
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1 sm:gap-2" id="departmentGrid">
                     ${defaultSheetNames.map(sheet => {
@@ -221,10 +219,17 @@ const renderGoogleSheetsDashboard = () => {
                     }).join('')}
                 </div>
             </div>
+            
+            <div class="px-3 py-2 border-t border-slate-100">
+                <button onclick="toggleFocusMode()" class="w-full px-4 py-2 ${state.focusMode ? 'bg-amber-500 text-white border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-300'} text-sm font-bold rounded-lg border transition-colors cursor-pointer">
+                    🎯 Задачи в фокусе
+                </button>
+            </div>
         </div>
             <div class="overflow-x-auto custom-scrollbar">
                 ${state.korsovetMode === 'plan_dnya' ? `
-                    <div class="mb-4">
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Фильтр статусов</label>
                         <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 cursor-pointer shadow-soft">
                             <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
                             <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
@@ -306,18 +311,18 @@ const renderAllDepartmentsTasks = () => {
 
             for (const task of block.tasks) {
                 html += `<div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" role="listitem">`;
-                html += `<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">`;
+                html += `<div class="flex flex-row justify-between items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">`;
                 html += `<div class="flex items-center gap-2">`;
                 html += `<span class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded bg-slate-100 text-slate-600 font-semibold text-xs sm:text-sm">${task.id}</span>`;
-                html += `<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-500">`;
-                html += task.product ? `<span>📦 <span class="hidden sm:inline">${task.product}</span></span>` : '';
-                html += task.timePlan ? `<span>⏱ ${task.timePlan}${task.timeFact ? '/' + task.timeFact : ''}</span>` : '';
+                html += task.timePlan ? `<span class="text-xs sm:text-sm text-slate-500">⏱ ${task.timePlan}${task.timeFact ? '/' + task.timeFact : ''}</span>` : '';
                 html += `</div>`;
+                html += `<span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusClass(task.status)}">${task.statusRaw || task.status || '-'}</span>`;
                 html += `</div>`;
                 html += `<span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusClass(task.status)}">${task.statusRaw || task.status || '-'}</span>`;
                 html += `</div>`;
                 html += `<div class="px-3 py-2">`;
                 html += `<div class="text-sm sm:text-base text-slate-800 font-medium leading-relaxed">${task.task || ''}</div>`;
+                html += task.product ? `<div class="text-xs sm:text-sm text-slate-500 mt-1">📦 ${task.product}</div>` : '';
                 html += task.comment ? `<div class="text-xs sm:text-sm text-slate-400 mt-1">💬 ${task.comment}</div>` : '';
                 html += `</div>`;
                 html += `</div>`;
@@ -410,18 +415,16 @@ const renderDepartmentTasks = (department) => {
                         <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer card-hover"
                              role="listitem"
                              onclick="toggleTaskDetails('${task.id}')">
-                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">
+                            <div class="flex flex-row justify-between items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">
                                 <div class="flex items-center gap-2">
                                     <span class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded bg-slate-100 text-slate-600 font-semibold text-xs sm:text-sm">${task.id}</span>
-                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-500">
-                                        ${task.product ? `<span>📦 <span class="hidden sm:inline">${task.product}</span></span>` : ''}
-                                        ${task.timePlan ? `<span>⏱ ${task.timePlan}${task.timeFact ? '/' + task.timeFact : ''}</span>` : ''}
-                                    </div>
+                                    ${task.timePlan ? `<span class="text-xs sm:text-sm text-slate-500">⏱ ${task.timePlan}${task.timeFact ? '/' + task.timeFact : ''}</span>` : ''}
                                 </div>
                                 <span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusClass(task.status)}">${task.status || '-'}</span>
                             </div>
                             <div class="px-3 py-2">
                                 <div class="text-sm sm:text-base text-slate-800 font-medium leading-relaxed">${task.task}</div>
+                                ${task.product ? `<div class="text-xs sm:text-sm text-slate-500 mt-1">📦 ${task.product}</div>` : ''}
                                 ${task.comment ? `<div class="text-xs sm:text-sm text-slate-400 mt-1">💬 ${task.comment}</div>` : ''}
                             </div>
                         </div>
@@ -511,38 +514,45 @@ const renderRoPRDepartment = (data) => {
 
 const renderRSODepartment = (data) => {
     if (!data || !data.weeks || data.weeks.length === 0) {
-        return '<div class="p-8 text-center text-slate-400">Нет данных</div>';
+        return '<div class="p-8 text-center text-slate-400">Нет данных. Нажмите "Обновить" для загрузки.</div>';
     }
     
-    return data.weeks.map(week => `
-        <div class="border-b border-slate-200 last:border-0">
-            <div class="bg-green-50 px-3 py-2 sm:px-4 sm:py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-l-4 border-green-600 shadow-sm">
-                <span class="font-bold text-green-900 text-sm sm:text-base">${week.period}</span>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs sm:text-sm font-medium text-green-700">${week.stats.completed}/${week.stats.total}</span>
-                    <span class="px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm font-bold text-white bg-green-600">${week.stats.percent || '0%'}</span>
+    return data.weeks.map(week => {
+        const weekCompleted = week.tasks.filter(t => (t.status || '').toLowerCase().includes('выполн')).length;
+        const weekTotal = week.tasks.length;
+        const weekPercent = weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0;
+        
+        if (week.tasks.length === 0) return '';
+        
+        return `
+            <div class="border-b border-slate-100 last:border-0 mb-4">
+                <div class="bg-white px-4 py-3 flex flex-nowrap flex-row justify-between items-center gap-2 border-l-4 border-green-500 shadow-soft rounded-r-xl">
+                    <span class="font-semibold text-slate-800">${week.period}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-slate-500">${weekCompleted}/${weekTotal}</span>
+                        <span class="px-3 py-1 font-semibold text-white rounded-full ${weekPercent >= 70 ? 'bg-green-500' : weekPercent >= 40 ? 'bg-amber-500' : 'bg-red-500'}">${weekPercent}%</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3 p-3" role="list" aria-label="Список задач">
+                    ${week.tasks.map(task => `
+                        <div class="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer card-hover"
+                             role="listitem">
+                            <div class="flex flex-row justify-between items-center px-3 py-2 bg-slate-50/50 border-b border-slate-100 group-hover:bg-slate-100 transition-colors gap-2">
+                                <span class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded bg-slate-100 text-slate-600 font-semibold text-xs sm:text-sm">${task.id}</span>
+                                <span class="px-2 py-0.5 rounded text-xs font-medium border ${getStatusClass(task.status)}">${task.status || '-'}</span>
+                            </div>
+                            <div class="px-3 py-2">
+                                <div class="text-sm sm:text-base text-slate-800 font-medium leading-relaxed">${task.task}</div>
+                                ${task.result ? `<div class="text-xs sm:text-sm text-slate-500 mt-1">📦 ${task.result}</div>` : ''}
+                                ${task.comment ? `<div class="text-xs sm:text-sm text-slate-400 mt-1">💬 ${task.comment}</div>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
-            
-            <div class="space-y-2 p-2 sm:p-3">
-                ${week.tasks.map(task => `
-                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                        <div class="flex justify-between items-center px-3 py-2 bg-slate-50 border-b border-slate-100">
-                            <span class="font-bold text-slate-700 text-xs sm:text-sm">#${task.id}</span>
-                            <span class="px-2 py-0.5 rounded text-xs font-bold border ${getStatusClass(task.status)}">${task.status}</span>
-                        </div>
-                        <div class="p-3 space-y-2">
-                            <div class="text-slate-900 font-medium text-sm">${task.task}</div>
-                            ${task.product ? `<div class="text-xs sm:text-sm"><span class="text-slate-500">📦:</span><span class="text-slate-700 ml-1">${task.product}</span></div>` : ''}
-                            ${task.comment ? `<div class="text-xs sm:text-sm"><span class="text-slate-500">💬:</span><span class="text-slate-700 ml-1">${task.comment}</span></div>` : ''}
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `).join('');
-};
-
+        `;
+    }).join('') + (data.weeks.every(week => week.tasks.length === 0) ? '<div class="p-8 text-center text-slate-400">Нет задач</div>' : '')};
 
 
 window.switchDepartment = (dept) => {
@@ -636,6 +646,40 @@ window.setStatusFilter = (filter) => {
     const filterSelect = document.getElementById('statusFilterSelect');
     if (filterSelect) filterSelect.value = filter;
 };
+
+window.toggleFocusMode = () => {
+    state.focusMode = !state.focusMode;
+    const container = document.querySelector('.overflow-x-auto.custom-scrollbar');
+    if (container) {
+        if (state.korsovetMode === 'plan_dnya') {
+            container.innerHTML = `
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Фильтр статусов</label>
+                    <select id="statusFilterSelect" onchange="setStatusFilter(this.value)" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 cursor-pointer shadow-soft">
+                        <option value="all" ${state.statusFilter === 'all' ? 'selected' : ''}>📋 Все</option>
+                        <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Выполнено</option>
+                        <option value="in_progress" ${state.statusFilter === 'in_progress' ? 'selected' : ''}>⟳ В работе</option>
+                        <option value="not_done" ${state.statusFilter === 'not_done' ? 'selected' : ''}>✕ Не выполнено</option>
+                    </select>
+                </div>
+                ${renderAllDepartmentsTasks()}
+            `;
+        } else {
+            container.innerHTML = renderDepartmentTasks(currentDepartment);
+        }
+    }
+    const focusBtn = document.querySelector('button[onclick="toggleFocusMode()"]');
+    if (focusBtn) {
+        if (state.focusMode) {
+            focusBtn.classList.add('bg-amber-500', 'text-white', 'border-amber-600');
+            focusBtn.classList.remove('bg-amber-100', 'text-amber-800', 'border-amber-300');
+        } else {
+            focusBtn.classList.remove('bg-amber-500', 'text-white', 'border-amber-600');
+            focusBtn.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-300');
+        }
+    }
+};
+
 window.setDirectorFilter = (type) => {
     state.reportType = type;
     render();
@@ -1733,25 +1777,25 @@ const parseRoPRData = (rows) => {
             }
         }
         
-        // Parse tasks (row starts with a number)
-        if ((currentSection === 'pastTasks' || currentSection === 'currentTasks' || currentSection === 'unplannedTasks') && row[0]?.trim()) {
-            const id = parseInt(row[0]);
-            if (!isNaN(id)) {
-                const task = {
-                    id,
-                    task: row[1]?.trim() || '',
-                    result: row[6]?.trim() || '',
-                    status: row[8]?.trim() || 'Без статуса',
-                    comment: row[11]?.trim() || ''
-                };
-                if (task.task) {
-                    if (currentSection === 'pastTasks') currentBlock.pastTasks.push(task);
-                    else if (currentSection === 'currentTasks') currentBlock.currentTasks.push(task);
-                    else if (currentSection === 'unplannedTasks') currentBlock.unplannedTasks.push(task);
-                    
-                    currentBlock.stats.total++;
-                    if (task.status.toLowerCase().includes('выполнено')) currentBlock.stats.completed++;
+        // Parse tasks (row starts with number)
+        if (row[0] && /^\d+$/.test(row[0])) {
+            const task = {
+                id: parseInt(row[0]),
+                task: row[1]?.trim() || '',
+                result: row[2]?.trim() || '',
+                status: row[3]?.trim() || 'Без статуса',
+                comment: row[4]?.trim() || ''
+            };
+            if (task.task && currentSection) {
+                if (currentSection === 'pastTasks') {
+                    currentBlock.pastTasks.push(task);
+                } else if (currentSection === 'currentTasks') {
+                    currentBlock.currentTasks.push(task);
+                } else if (currentSection === 'unplannedTasks') {
+                    currentBlock.unplannedTasks.push(task);
                 }
+                currentBlock.stats.total++;
+                if (task.status.toLowerCase().includes('выполнено')) currentBlock.stats.completed++;
             }
         }
         
@@ -1767,16 +1811,14 @@ const parseRoPRData = (rows) => {
     
     if (currentBlock) weeks.push(currentBlock);
     
-    // Filter only current and previous month
+    // Filter only current month
     const filterCurrentMonth = new Date().getMonth() + 1;
-    const filterPrevMonth = filterCurrentMonth === 1 ? 12 : filterCurrentMonth - 1;
-    const monthsToShow = [filterCurrentMonth, filterPrevMonth];
     
     const filteredWeeks = weeks.filter(week => {
         const dateMatch = week.period.match(/(\d{2})\.(\d{2})/);
         if (dateMatch) {
             const month = parseInt(dateMatch[2]);
-            return monthsToShow.includes(month);
+            return month === filterCurrentMonth;
         }
         return false;
     });
@@ -1963,7 +2005,7 @@ const parseRSOData = (rows) => {
             const task = {
                 id: parseInt(row[0]),
                 task: row[1] || '',
-                product: row[2] || '',
+                result: row[2] || '',
                 status: row[3] || 'Без статуса',
                 comment: row[4] || ''
             };
