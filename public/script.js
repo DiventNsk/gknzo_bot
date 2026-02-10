@@ -163,7 +163,7 @@ const renderGoogleSheetsDashboard = () => {
     return `
     <div class="animate-fade-in-up">
         <div class="flex flex-row justify-between items-center mb-4 pb-3 border-b border-slate-200">
-            <h1 class="text-xl font-bold text-slate-900 tracking-tight" role="banner">${state.korsovetMode === 'korsovet' ? 'Корсовет' : 'План дня'}</h1>
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight" role="banner">${state.korsovetMode === 'korsovet' ? 'Корсовет (Топ)' : 'План дня (Топ)'}</h1>
             <span class="text-sm font-medium text-slate-700">${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             <button
                 onclick="loadAllDepartments()"
@@ -182,14 +182,14 @@ const renderGoogleSheetsDashboard = () => {
                         class="px-5 py-3 text-sm font-bold rounded-lg transition-all ${state.korsovetMode === 'korsovet' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" 
                         aria-pressed="${state.korsovetMode === 'korsovet'}"
                         tabindex="0">
-                        Корсовет
+                        Корсовет (Топ)
                     </button>
                     <button 
                         onclick="switchKorsovetMode('plan_dnya')" 
                         class="px-5 py-3 text-sm font-bold rounded-lg transition-all ${state.korsovetMode === 'plan_dnya' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" 
                         aria-pressed="${state.korsovetMode === 'plan_dnya'}"
                         tabindex="0">
-                        План дня
+                        План дня (Топ)
                     </button>
                 </div>
             </div>
